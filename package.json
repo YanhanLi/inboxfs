@@ -1,0 +1,60 @@
+{
+  "name": "inboxfs",
+  "version": "0.1.0",
+  "description": "A local-first inbox for organizing files with safe previews and undo.",
+  "type": "module",
+  "bin": {
+    "inboxfs": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "web-dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "dev": "tsx src/cli.ts",
+    "build:server": "tsc -p tsconfig.server.json",
+    "build:web": "vite build",
+    "build": "npm run build:server && npm run build:web",
+    "test": "vitest run --config vitest.config.ts",
+    "check": "npm run build && npm test",
+    "prepare": "npm run build"
+  },
+  "engines": {
+    "node": ">=22.5"
+  },
+  "keywords": [
+    "downloads",
+    "file-organizer",
+    "local-first",
+    "productivity",
+    "privacy"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/YanhanLi/inboxfs.git"
+  },
+  "homepage": "https://github.com/YanhanLi/inboxfs#readme",
+  "bugs": "https://github.com/YanhanLi/inboxfs/issues",
+  "dependencies": {
+    "express": "^5.1.0",
+    "open": "^10.2.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "jsdom": "^26.1.0",
+    "lucide-react": "^0.468.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.5",
+    "vitest": "^3.2.4"
+  }
+}
