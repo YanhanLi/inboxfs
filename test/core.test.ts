@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { rm } from "node:fs/promises";
 import { organizeFiles, undoMove } from "../src/organizer.js";
 import { scanInbox } from "../src/scanner.js";
+import { defaultLedgerPath, recordsForRoot } from "../src/ledger.js";
 
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
@@ -62,5 +63,59 @@ describe("InboxFS core", () => {
     const scan = await scanInbox(root);
     await expect(organizeFiles(root, [scan.suggestions[0].id], ledger)).rejects.toThrow("outside the inbox root");
     expect(await readFile(path.join(root, "paper.pdf"), "utf8")).toBe("private");
+  });
+
+  it("rolls back earlier files when a batch move fails", async () => {
+    const root = await inbox();
+    const ledger = path.join(root, ".ledger.json");
+    await writeFile(path.join(root, "a.txt"), "first");
+    await writeFile(path.join(root, "b.txt"), "second");
+    const scan = await scanInbox(root);
+    let calls = 0;
+    const renameFile = async (source: string, destination: string) => {
+      calls += 1;
+      if (calls === 2) throw new Error("simulated disk failure");
+      await import("node:fs/promises").then(({ rename }) => rename(source, destination));
+    };
+    await expect(organizeFiles(root, scan.suggestions.map((item) => item.id), ledger, { renameFile })).rejects.toThrow("simulated disk failure");
+    expect(await readFile(path.join(root, "a.txt"), "utf8")).toBe("first");
+    expect(await readFile(path.join(root, "b.txt"), "utf8")).toBe("second");
+  });
+
+  it("detects duplicate content and leaves later copies unselected", async () => {
+    const root = await inbox();
+    await writeFile(path.join(root, "original.pdf"), "same content");
+    await writeFile(path.join(root, "copy.pdf"), "same content");
+    const scan = await scanInbox(root);
+    expect(scan.suggestions.filter((item) => item.duplicateOf)).toHaveLength(1);
+    expect(scan.suggestions.filter((item) => item.selected)).toHaveLength(1);
+  });
+
+  it("detects a loose duplicate of an already organized file", async () => {
+    const root = await inbox();
+    await import("node:fs/promises").then(({ mkdir }) => mkdir(path.join(root, "Documents")));
+    await writeFile(path.join(root, "Documents", "saved.pdf"), "same content");
+    await writeFile(path.join(root, "download.pdf"), "same content");
+    const scan = await scanInbox(root);
+    const canonicalRoot = await import("node:fs/promises").then(({ realpath }) => realpath(root));
+    expect(scan.suggestions[0].duplicateOf).toBe(path.join(canonicalRoot, "Documents", "saved.pdf"));
+    expect(scan.suggestions[0].selected).toBe(false);
+  });
+
+  it("uses distinct ledgers for directories with a long shared prefix", () => {
+    const prefix = "/tmp/a-very-long-shared-directory-prefix-that-used-to-collide/";
+    expect(defaultLedgerPath(`${prefix}first`)).not.toBe(defaultLedgerPath(`${prefix}second`));
+  });
+
+  it("filters collided legacy history during migration", () => {
+    const root = "/tmp/inbox-a";
+    const record = (sourceRoot: string) => ({
+      id: sourceRoot,
+      createdAt: new Date(0).toISOString(),
+      sourcePath: path.join(sourceRoot, "file.txt"),
+      destinationPath: path.join(sourceRoot, "Documents", "file.txt"),
+      contentHash: "hash"
+    });
+    expect(recordsForRoot(root, [record(root), record("/tmp/inbox-b")])).toEqual([record(root)]);
   });
 });

@@ -1,7 +1,7 @@
-import { ArchiveRestore, Check, File, FolderInput, History, Inbox, RefreshCw, Search, ShieldCheck, Undo2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { ArchiveRestore, Check, Copy, File, FolderInput, History, Inbox, RefreshCw, Search, ShieldCheck, Undo2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-interface Suggestion { id: string; name: string; category: string; size: number; modifiedAt: string; destinationPath: string }
+interface Suggestion { id: string; name: string; category: string; size: number; modifiedAt: string; destinationPath: string; selected: boolean; duplicateOf?: string }
 interface Scan { root: string; scannedAt: string; suggestions: Suggestion[]; categoryCounts: Record<string, number>; totalSize: number }
 interface Record { id: string; createdAt: string; sourcePath: string; destinationPath: string; undoneAt?: string }
 
@@ -23,20 +23,53 @@ export function App() {
   const [category, setCategory] = useState("All files");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const selectionOverrides = useRef<Map<string, boolean>>(new Map());
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (preserveSelection = false) => {
     setBusy(true);
     try {
       const [nextScan, nextHistory] = await Promise.all([json<Scan>("/api/scan"), json<Record[]>("/api/history")]);
-      setScan(nextScan); setHistory(nextHistory); setSelected(new Set(nextScan.suggestions.map((item) => item.id)));
+      setScan(nextScan); setHistory(nextHistory);
+      if (!preserveSelection) selectionOverrides.current.clear();
+      const available = new Set(nextScan.suggestions.map((item) => item.id));
+      for (const id of selectionOverrides.current.keys()) {
+        if (!available.has(id)) selectionOverrides.current.delete(id);
+      }
+      setSelected(new Set(nextScan.suggestions
+        .filter((item) => selectionOverrides.current.get(item.id) ?? item.selected)
+        .map((item) => item.id)));
     } catch (error) { setNotice(error instanceof Error ? error.message : "Unable to scan folder"); }
     finally { setBusy(false); }
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    const events = new EventSource("/api/events");
+    events.addEventListener("changed", () => void refresh(true));
+    return () => events.close();
+  }, [refresh]);
 
   const filtered = useMemo(() => (scan?.suggestions ?? []).filter((item) =>
-    (category === "All files" || item.category === category) && item.name.toLowerCase().includes(query.toLowerCase())), [scan, query, category]);
-  const categories = ["All files", ...Object.keys(scan?.categoryCounts ?? {})];
+    (category === "All files" || (category === "Duplicates" ? Boolean(item.duplicateOf) : item.category === category)) && item.name.toLowerCase().includes(query.toLowerCase())), [scan, query, category]);
+  const duplicateCount = scan?.suggestions.filter((item) => item.duplicateOf).length ?? 0;
+  const categories = ["All files", ...(duplicateCount ? ["Duplicates"] : []), ...Object.keys(scan?.categoryCounts ?? {})];
+
+  function setItemSelected(id: string, value: boolean) {
+    selectionOverrides.current.set(id, value);
+    setSelected((current) => {
+      const next = new Set(current);
+      value ? next.add(id) : next.delete(id);
+      return next;
+    });
+  }
+
+  function setFilteredSelected(value: boolean) {
+    for (const item of filtered) selectionOverrides.current.set(item.id, value);
+    setSelected((current) => {
+      const next = new Set(current);
+      for (const item of filtered) value ? next.add(item.id) : next.delete(item.id);
+      return next;
+    });
+  }
 
   async function organize() {
     if (!selected.size) return;
@@ -68,7 +101,7 @@ export function App() {
       <section className="summary">
         <div><small>Ready to organize</small><strong>{scan?.suggestions.length ?? 0}</strong></div>
         <div><small>Selected size</small><strong>{formatSize((scan?.suggestions ?? []).filter(x => selected.has(x.id)).reduce((n, x) => n + x.size, 0))}</strong></div>
-        <div><small>Destinations</small><strong>{Object.keys(scan?.categoryCounts ?? {}).length}</strong></div>
+        <div><small>Duplicates held back</small><strong>{duplicateCount}</strong></div>
       </section>
       <div className="toolbar">
         <label><Search size={17} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Filter files" /></label>
@@ -77,11 +110,11 @@ export function App() {
       </div>
       {notice && <div className="notice">{notice}</div>}
       <section className="filelist">
-        <div className="listhead"><input type="checkbox" checked={filtered.length > 0 && filtered.every(x => selected.has(x.id))} onChange={e => setSelected(e.target.checked ? new Set([...selected, ...filtered.map(x => x.id)]) : new Set([...selected].filter(id => !filtered.some(x => x.id === id))))} /><span>File</span><span>Destination</span><span>Size</span></div>
+        <div className="listhead"><input type="checkbox" checked={filtered.length > 0 && filtered.every(x => selected.has(x.id))} onChange={e => setFilteredSelected(e.target.checked)} /><span>File</span><span>Destination</span><span>Size</span></div>
         {filtered.map(item => <div className="row" key={item.id}>
-          <input type="checkbox" checked={selected.has(item.id)} onChange={() => setSelected(current => { const next = new Set(current); next.has(item.id) ? next.delete(item.id) : next.add(item.id); return next; })} />
+          <input type="checkbox" checked={selected.has(item.id)} onChange={e => setItemSelected(item.id, e.target.checked)} />
           <div className="filename"><File size={18} /><span><strong>{item.name}</strong><small>{new Date(item.modifiedAt).toLocaleDateString()}</small></span></div>
-          <span className="destination"><Check size={14} /> {item.category}</span><span>{formatSize(item.size)}</span>
+          <span className={item.duplicateOf ? "destination duplicate" : "destination"}>{item.duplicateOf ? <Copy size={14} /> : <Check size={14} />}{item.duplicateOf ? `Matches ${basename(item.duplicateOf)}` : item.category}</span><span>{formatSize(item.size)}</span>
         </div>)}
         {!busy && !filtered.length && <div className="empty"><Inbox size={28} /><strong>Inbox is clear</strong><span>No loose files match this view.</span></div>}
       </section>

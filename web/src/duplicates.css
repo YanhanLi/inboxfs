@@ -1,0 +1,15 @@
+.destination.duplicate {
+  color: #956514;
+  font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  .toolbar label {
+    flex: 1 0 100%;
+  }
+
+  .toolbar select {
+    flex: 1;
+    min-width: 0;
+  }
+}

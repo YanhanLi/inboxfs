@@ -1,27 +1,34 @@
-import { createHash, randomUUID } from "node:crypto";
-import { createReadStream } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { lstat, mkdir, realpath, rename, stat } from "node:fs/promises";
 import path from "node:path";
-import { defaultLedgerPath, readLedger, writeLedger } from "./ledger.js";
+import { readLedger, resolveLedgerPath, writeLedger } from "./ledger.js";
 import { assertInsideRoot } from "./path-safety.js";
 import { scanInbox } from "./scanner.js";
 import type { MoveRecord } from "./model.js";
+import { hashFile } from "./file-hash.js";
 
-export async function hashFile(filename: string): Promise<string> {
-  const hash = createHash("sha256");
-  for await (const chunk of createReadStream(filename)) hash.update(chunk);
-  return hash.digest("hex");
+interface OrganizerOperations {
+  renameFile(source: string, destination: string): Promise<void>;
 }
 
-export async function organizeFiles(root: string, suggestionIds: string[], ledgerPath = defaultLedgerPath(root)): Promise<MoveRecord[]> {
+const defaultOperations: OrganizerOperations = { renameFile: rename };
+
+export async function organizeFiles(
+  root: string,
+  suggestionIds: string[],
+  ledgerPath?: string,
+  operations: OrganizerOperations = defaultOperations
+): Promise<MoveRecord[]> {
   const canonicalRoot = await realpath(root);
+  const activeLedgerPath = ledgerPath ?? await resolveLedgerPath(canonicalRoot);
   const scan = await scanInbox(canonicalRoot);
   const requested = new Set(suggestionIds);
   const selected = scan.suggestions.filter((item) => requested.has(item.id));
   if (selected.length !== requested.size) throw new Error("One or more files changed since the preview. Refresh and try again.");
 
-  const records = await readLedger(ledgerPath);
-  const created: MoveRecord[] = [];
+  const records = await readLedger(activeLedgerPath);
+  const batchId = randomUUID();
+  const prepared: MoveRecord[] = [];
   for (const item of selected) {
     assertInsideRoot(canonicalRoot, item.sourcePath);
     assertInsideRoot(canonicalRoot, item.destinationPath);
@@ -30,24 +37,44 @@ export async function organizeFiles(root: string, suggestionIds: string[], ledge
     await mkdir(path.dirname(item.destinationPath), { recursive: true });
     assertInsideRoot(canonicalRoot, await realpath(path.dirname(item.destinationPath)));
     const contentHash = await hashFile(item.sourcePath);
-    await rename(item.sourcePath, item.destinationPath);
-    const record: MoveRecord = {
+    prepared.push({
       id: randomUUID(),
+      batchId,
       createdAt: new Date().toISOString(),
       sourcePath: item.sourcePath,
       destinationPath: item.destinationPath,
       contentHash
-    };
-    records.push(record);
-    created.push(record);
+    });
   }
-  await writeLedger(ledgerPath, records);
-  return created;
+
+  const moved: MoveRecord[] = [];
+  try {
+    for (const record of prepared) {
+      await operations.renameFile(record.sourcePath, record.destinationPath);
+      moved.push(record);
+    }
+    await writeLedger(activeLedgerPath, [...records, ...prepared]);
+    return prepared;
+  } catch (error) {
+    const rollbackFailures: string[] = [];
+    for (const record of moved.reverse()) {
+      try {
+        await operations.renameFile(record.destinationPath, record.sourcePath);
+      } catch {
+        rollbackFailures.push(record.destinationPath);
+      }
+    }
+    if (rollbackFailures.length) {
+      throw new Error(`Organization failed and rollback was incomplete: ${rollbackFailures.join(", ")}`, { cause: error });
+    }
+    throw error;
+  }
 }
 
-export async function undoMove(root: string, recordId: string, ledgerPath = defaultLedgerPath(root)): Promise<MoveRecord> {
+export async function undoMove(root: string, recordId: string, ledgerPath?: string): Promise<MoveRecord> {
   const canonicalRoot = await realpath(root);
-  const records = await readLedger(ledgerPath);
+  const activeLedgerPath = ledgerPath ?? await resolveLedgerPath(canonicalRoot);
+  const records = await readLedger(activeLedgerPath);
   const record = records.find((item) => item.id === recordId);
   if (!record || record.undoneAt) throw new Error("Move record is missing or has already been undone.");
   assertInsideRoot(canonicalRoot, record.sourcePath);
@@ -63,6 +90,6 @@ export async function undoMove(root: string, recordId: string, ledgerPath = defa
   }
   await rename(record.destinationPath, record.sourcePath);
   record.undoneAt = new Date().toISOString();
-  await writeLedger(ledgerPath, records);
+  await writeLedger(activeLedgerPath, records);
   return record;
 }

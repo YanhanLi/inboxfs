@@ -4,6 +4,7 @@ import path from "node:path";
 import { classify, extensionOf } from "./classifier.js";
 import { availableDestination } from "./path-safety.js";
 import type { FileSuggestion, ScanResult } from "./model.js";
+import { hashFile } from "./file-hash.js";
 
 function suggestionId(sourcePath: string, modifiedMs: number, size: number): string {
   return createHash("sha256").update(`${sourcePath}\0${modifiedMs}\0${size}`).digest("hex").slice(0, 16);
@@ -14,12 +15,27 @@ export async function scanInbox(root: string): Promise<ScanResult> {
   const entries = await readdir(canonicalRoot, { withFileTypes: true });
   const occupied = new Set(entries.map((entry) => path.join(canonicalRoot, entry.name)));
   const suggestions: FileSuggestion[] = [];
+  const candidatesBySize = new Map<number, string[]>();
+  const hashCache = new Map<string, Promise<string>>();
+  const cachedHash = (filename: string) => {
+    const existing = hashCache.get(filename);
+    if (existing) return existing;
+    const digest = hashFile(filename);
+    hashCache.set(filename, digest);
+    return digest;
+  };
 
   for (const entry of entries) {
     if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
     const directory = path.join(canonicalRoot, entry.name);
     for (const child of await readdir(directory, { withFileTypes: true })) {
-      occupied.add(path.join(directory, child.name));
+      const childPath = path.join(directory, child.name);
+      occupied.add(childPath);
+      if (!child.isFile() || child.isSymbolicLink()) continue;
+      const metadata = await stat(childPath);
+      const candidates = candidatesBySize.get(metadata.size) ?? [];
+      candidates.push(childPath);
+      candidatesBySize.set(metadata.size, candidates);
     }
   }
 
@@ -31,6 +47,18 @@ export async function scanInbox(root: string): Promise<ScanResult> {
     const candidate = path.join(canonicalRoot, category, entry.name);
     const destinationPath = availableDestination(candidate, occupied);
     occupied.add(destinationPath);
+    let duplicateOf: string | undefined;
+    let duplicateHash: string | undefined;
+    const sameSize = candidatesBySize.get(metadata.size) ?? [];
+    if (sameSize.length) {
+      duplicateHash = await cachedHash(sourcePath);
+      for (const existing of sameSize) {
+        if (await cachedHash(existing) === duplicateHash) {
+          duplicateOf = existing;
+          break;
+        }
+      }
+    }
     suggestions.push({
       id: suggestionId(sourcePath, metadata.mtimeMs, metadata.size),
       name: entry.name,
@@ -40,8 +68,12 @@ export async function scanInbox(root: string): Promise<ScanResult> {
       modifiedAt: metadata.mtime.toISOString(),
       sourcePath,
       destinationPath,
-      selected: true
+      selected: !duplicateOf,
+      duplicateOf,
+      duplicateHash
     });
+    sameSize.push(sourcePath);
+    candidatesBySize.set(metadata.size, sameSize);
   }
 
   return {

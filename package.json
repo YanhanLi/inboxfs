@@ -1,6 +1,6 @@
 {
   "name": "inboxfs",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A local-first inbox for organizing files with safe previews and undo.",
   "type": "module",
   "bin": {
@@ -10,6 +10,7 @@
     "dist",
     "web-dist",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "scripts": {
@@ -49,9 +50,11 @@
     "@types/node": "^24.0.0",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
+    "@types/supertest": "^7.2.1",
     "@vitejs/plugin-react": "^4.7.0",
     "jsdom": "^26.1.0",
     "lucide-react": "^0.468.0",
+    "supertest": "^7.2.2",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "vite": "^7.1.5",

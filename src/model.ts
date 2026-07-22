@@ -19,10 +19,13 @@ export interface FileSuggestion {
   sourcePath: string;
   destinationPath: string;
   selected: boolean;
+  duplicateOf?: string;
+  duplicateHash?: string;
 }
 
 export interface MoveRecord {
   id: string;
+  batchId?: string;
   createdAt: string;
   sourcePath: string;
   destinationPath: string;
