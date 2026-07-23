@@ -20,13 +20,13 @@ import {
   SlidersHorizontal,
   ShieldCheck,
   Sun,
-  Undo2,
 } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { json } from "./api";
 
 const RulesDialog = lazy(() => import("./RulesDialog").then((module) => ({ default: module.RulesDialog })));
 const Inspector = lazy(() => import("./Inspector").then((module) => ({ default: module.Inspector })));
+const HistoryList = lazy(() => import("./HistoryList").then((module) => ({ default: module.HistoryList })));
 
 interface Suggestion { id: string; name: string; extension: string; category: string; size: number; modifiedAt: string; sourcePath: string; destinationPath: string; classification: { type: "custom" | "extension" | "fallback"; pattern: string; explanation: string; ruleName?: string; source?: string }; selected: boolean; duplicateOf?: string; duplicateHash?: string }
 interface Scan { root: string; scannedAt: string; suggestions: Suggestion[]; categoryCounts: Record<string, number>; totalSize: number; ruleConfig: { customRuleCount: number; source?: string } }
@@ -243,12 +243,7 @@ export function App() {
       <section className="activity" id="activity" aria-labelledby="activity-heading">
         <div className="section-heading"><div><h2 id="activity-heading">Recent activity</h2><p>{history.length} moves recorded</p></div></div>
         <div className="history-list">
-          {history.slice(0, 8).map((record) => <div className="history-row" key={record.id}>
-            <span className="history-icon"><History size={16} aria-hidden="true" /></span>
-            <div><strong>{basename(record.destinationPath)}</strong><small>{record.undoneAt ? "Returned to inbox" : `Moved to ${parentFolder(record.destinationPath)}`}</small></div>
-            <time>{new Date(record.createdAt).toLocaleString()}</time>
-            <button className="icon-button" aria-label={`Undo move of ${basename(record.destinationPath)}`} title="Undo move" disabled={busy || Boolean(record.undoneAt)} onClick={() => void undo(record.id)}><Undo2 size={16} /></button>
-          </div>)}
+          {history.length > 0 && <Suspense fallback={null}><HistoryList records={history} busy={busy} onUndo={(id) => void undo(id)} /></Suspense>}
           {!history.length && <div className="activity-empty"><History size={18} aria-hidden="true" /><span>Organized files will appear here.</span></div>}
         </div>
       </section>
