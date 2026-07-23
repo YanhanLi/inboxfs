@@ -10,6 +10,7 @@ try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, colorScheme: "light" });
   await page.goto(baseUrl, { waitUntil: "load" });
   await page.getByRole("heading", { name: "All files" }).waitFor();
+  await page.getByRole("button", { name: "Inspect chapter.epub" }).waitFor();
   await page.screenshot({ path: path.resolve("docs/inboxfs-workspace.png"), fullPage: true });
 
   const rulesButton = page.getByRole("button", { name: /^Rules/ });
@@ -41,7 +42,9 @@ try {
   await page.getByRole("button", { name: "Close custom rules" }).click();
 
   await aiButton.click();
-  await page.getByRole("dialog", { name: "Review unmatched files" }).waitFor();
+  const darkAiDialog = page.getByRole("dialog", { name: "Review unmatched files" });
+  await darkAiDialog.getByRole("button", { name: "Analyze", exact: true }).click();
+  await darkAiDialog.getByText("Review suggestions", { exact: true }).waitFor();
   await page.waitForTimeout(300);
   await page.screenshot({ path: path.resolve("docs/inboxfs-ai-dark.png") });
 } finally {
