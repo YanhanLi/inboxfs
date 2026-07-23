@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+- Reserve green for selection, success, and the primary organize action.
+- Use neutral destination labels to reduce visual noise in the file table.
+- Keep the duplicate metric neutral at zero and introduce amber only when duplicates are present.
+
 ## 0.3.0
 
 - Redesign the React workspace around a denser file-operations layout.

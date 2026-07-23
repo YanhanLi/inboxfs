@@ -16,6 +16,7 @@
   --amber-soft: #fff1d6;
   --blue: #2d6488;
   --blue-soft: #e7f0f6;
+  --neutral-soft: #edf0f1;
   --focus: #2684ff;
   --radius: 7px;
 }
@@ -79,6 +80,7 @@ h1 { font-size: 26px; line-height: 1.2; letter-spacing: 0; }
 .metric-ready { background: var(--green-soft); color: var(--green); }
 .metric-size { background: var(--blue-soft); color: var(--blue); }
 .metric-duplicate { background: var(--amber-soft); color: var(--amber); }
+.metric-duplicate.is-empty { background: var(--neutral-soft); color: #657078; }
 
 .workspace, .activity { scroll-margin-top: 20px; }
 .section-heading { min-height: 48px; display: flex; align-items: start; justify-content: space-between; gap: 16px; }
@@ -102,8 +104,8 @@ h1 { font-size: 26px; line-height: 1.2; letter-spacing: 0; }
 .listhead { height: 40px; border-bottom: 1px solid var(--border); background: #f0f2f2; color: #646d74; font-size: 10px; font-weight: 750; text-transform: uppercase; }
 .row { min-height: 64px; border-bottom: 1px solid #eaeced; color: #50585f; font-size: 12px; transition: background 160ms ease; }
 .row:last-child { border-bottom: 0; }
-.row:hover, .row.selected { background: #f6faf8; }
-.row.selected { box-shadow: inset 3px 0 var(--green); }
+.row:hover { background: #f8f9f9; }
+.row.selected { background: #fbfcfc; box-shadow: inset 2px 0 var(--green); }
 .checkbox-cell { width: 44px; height: 44px; margin-left: -10px; display: grid; place-items: center; }
 input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--green); }
 .filename { min-width: 0; display: flex; align-items: center; gap: 11px; }
@@ -112,7 +114,7 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--green); 
 .filename small { color: var(--text-muted); display: flex; align-items: center; gap: 4px; font-size: 10px; }
 .file-icon { width: 34px; height: 34px; flex: 0 0 auto; border: 1px solid #dbe1e4; border-radius: 6px; background: #f5f7f8; color: #5d6a73; display: grid; place-items: center; }
 .destination { min-width: 0; display: grid; gap: 4px; }
-.destination > span { width: fit-content; max-width: 100%; padding: 3px 7px; border-radius: 4px; background: var(--green-soft); color: var(--green); display: flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; }
+.destination > span { width: fit-content; max-width: 100%; padding: 3px 7px; border-radius: 4px; background: var(--neutral-soft); color: #465159; display: flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; }
 .destination small { overflow: hidden; color: var(--text-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .destination.duplicate > span { background: var(--amber-soft); color: #895508; }
 .file-size { color: #545d64; font-size: 11px; font-variant-numeric: tabular-nums; text-align: right; }
