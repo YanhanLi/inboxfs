@@ -7,16 +7,13 @@ import {
   ClipboardCheck,
   Copy,
   File,
-  FileSearch,
   Files,
   FolderClosed,
   FolderInput,
   HardDrive,
-  Hash,
   History,
   Info,
   Inbox,
-  MapPin,
   Moon,
   RefreshCw,
   Search,
@@ -24,12 +21,12 @@ import {
   ShieldCheck,
   Sun,
   Undo2,
-  X,
 } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { json } from "./api";
 
 const RulesDialog = lazy(() => import("./RulesDialog").then((module) => ({ default: module.RulesDialog })));
+const Inspector = lazy(() => import("./Inspector").then((module) => ({ default: module.Inspector })));
 
 interface Suggestion { id: string; name: string; extension: string; category: string; size: number; modifiedAt: string; sourcePath: string; destinationPath: string; classification: { type: "custom" | "extension" | "fallback"; pattern: string; explanation: string; ruleName?: string; source?: string }; selected: boolean; duplicateOf?: string; duplicateHash?: string }
 interface Scan { root: string; scannedAt: string; suggestions: Suggestion[]; categoryCounts: Record<string, number>; totalSize: number; ruleConfig: { customRuleCount: number; source?: string } }
@@ -63,18 +60,12 @@ export function App() {
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const [rulesOpen, setRulesOpen] = useState(false);
   const selectionOverrides = useRef<Map<string, boolean>>(new Map());
-  const inspectorRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#151719" : "#f4f5f6");
     try { localStorage.setItem("inboxfs-theme", theme); } catch { /* Theme still applies for this session. */ }
   }, [theme]);
-  useEffect(() => {
-    const inspector = inspectorRef.current;
-    if (inspectedId && inspector && !inspector.open) inspector.showModal();
-    if (!inspectedId && inspector?.open) inspector.close();
-  }, [inspectedId]);
   useEffect(() => {
     if (scan && inspectedId && !scan.suggestions.some((item) => item.id === inspectedId)) setInspectedId(undefined);
   }, [scan, inspectedId]);
@@ -263,24 +254,7 @@ export function App() {
       </section>
     </main>
 
-    <dialog className="inspector" ref={inspectorRef} aria-labelledby="inspector-title" onCancel={(event) => { event.preventDefault(); setInspectedId(undefined); }} onClose={() => setInspectedId(undefined)}>
-      {inspected && <div className="inspector-panel">
-        <header className="inspector-header"><div><span>File review</span><h2 id="inspector-title">Details</h2></div><button className="icon-button" aria-label="Close file details" title="Close" onClick={() => setInspectedId(undefined)}><X size={18} /></button></header>
-        <div className="inspector-file"><span><FileSearch size={22} aria-hidden="true" /></span><div><strong title={inspected.name}>{inspected.name}</strong><small>{inspected.category} · {formatSize(inspected.size)}</small></div></div>
-
-        <section className="inspector-section" aria-labelledby="location-heading"><h3 id="location-heading">Location</h3><dl>
-          <div><dt><MapPin size={14} aria-hidden="true" />Source</dt><dd title={inspected.sourcePath}>{inspected.sourcePath}</dd></div>
-          <div><dt><FolderClosed size={14} aria-hidden="true" />Destination</dt><dd title={inspected.destinationPath}>{inspected.destinationPath}</dd></div>
-          <div><dt><Clock3 size={14} aria-hidden="true" />Modified</dt><dd>{new Date(inspected.modifiedAt).toLocaleString()}</dd></div>
-        </dl></section>
-
-        <section className="inspector-section rule-section" aria-labelledby="rule-heading"><div className="inspector-section-title"><h3 id="rule-heading">Classification rule</h3><span className={`rule-badge ${inspected.classification.type}`}>{inspected.classification.pattern}</span></div><p>{inspected.classification.explanation}</p>{inspected.classification.source && <small className="rule-source"><File size={13} aria-hidden="true" />{inspected.classification.ruleName} · {inspected.classification.source}</small>}</section>
-
-        {inspected.duplicateOf && <section className="inspector-section duplicate-section" aria-labelledby="duplicate-heading"><h3 id="duplicate-heading">Duplicate match</h3><p title={inspected.duplicateOf}>{inspected.duplicateOf}</p>{inspected.duplicateHash && <code><Hash size={13} aria-hidden="true" />{inspected.duplicateHash}</code>}</section>}
-
-        <section className="inspector-section plan-control" aria-labelledby="plan-heading"><div><h3 id="plan-heading">Organization plan</h3><p>{selected.has(inspected.id) ? "Included in the next organization run." : inspected.duplicateOf ? "Held back because identical content already exists." : "Not included in the next organization run."}</p></div><label><span>{selected.has(inspected.id) ? "Included" : "Excluded"}</span><input type="checkbox" checked={selected.has(inspected.id)} onChange={(event) => setItemSelected(inspected.id, event.target.checked)} /></label></section>
-      </div>}
-    </dialog>
+    {inspected && <Suspense fallback={null}><Inspector item={inspected} included={selected.has(inspected.id)} onClose={() => setInspectedId(undefined)} onSelected={(value) => setItemSelected(inspected.id, value)} /></Suspense>}
 
     {rulesOpen && <Suspense fallback={null}><RulesDialog onClose={() => setRulesOpen(false)} onSaved={rulesSaved} /></Suspense>}
   </div>;
