@@ -1,4 +1,20 @@
-import { ArchiveRestore, Check, Copy, File, FolderInput, History, Inbox, RefreshCw, Search, ShieldCheck, Undo2 } from "lucide-react";
+import {
+  ArchiveRestore,
+  Check,
+  Clock3,
+  Copy,
+  File,
+  Files,
+  FolderClosed,
+  FolderInput,
+  HardDrive,
+  History,
+  Inbox,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  Undo2,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface Suggestion { id: string; name: string; category: string; size: number; modifiedAt: string; destinationPath: string; selected: boolean; duplicateOf?: string }
@@ -7,6 +23,7 @@ interface Record { id: string; createdAt: string; sourcePath: string; destinatio
 
 const formatSize = (bytes: number) => bytes < 1024 ? `${bytes} B` : bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`;
 const basename = (value: string) => value.split(/[\\/]/).pop() ?? value;
+const parentFolder = (value: string) => basename(value.split(/[\\/]/).slice(0, -1).join("/"));
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { headers: { "Content-Type": "application/json" }, ...init });
@@ -52,6 +69,14 @@ export function App() {
     (category === "All files" || (category === "Duplicates" ? Boolean(item.duplicateOf) : item.category === category)) && item.name.toLowerCase().includes(query.toLowerCase())), [scan, query, category]);
   const duplicateCount = scan?.suggestions.filter((item) => item.duplicateOf).length ?? 0;
   const categories = ["All files", ...(duplicateCount ? ["Duplicates"] : []), ...Object.keys(scan?.categoryCounts ?? {})];
+  const selectedSize = (scan?.suggestions ?? []).filter((item) => selected.has(item.id)).reduce((total, item) => total + item.size, 0);
+  const allFilteredSelected = filtered.length > 0 && filtered.every((item) => selected.has(item.id));
+
+  function categoryCount(item: string) {
+    if (item === "All files") return scan?.suggestions.length ?? 0;
+    if (item === "Duplicates") return duplicateCount;
+    return scan?.categoryCounts[item] ?? 0;
+  }
 
   function setItemSelected(id: string, value: boolean) {
     selectionOverrides.current.set(id, value);
@@ -88,39 +113,79 @@ export function App() {
   }
 
   return <div className="shell">
-    <aside>
-      <div className="brand"><span><Inbox size={19} /></span> InboxFS</div>
-      <nav>
-        <button className="active"><FolderInput size={17} /> Inbox <b>{scan?.suggestions.length ?? 0}</b></button>
-        <button onClick={() => document.getElementById("activity")?.scrollIntoView()}><History size={17} /> Activity</button>
+    <a className="skip-link" href="#main-content">Skip to files</a>
+    <aside className="sidebar">
+      <div className="brand"><span><Inbox size={18} aria-hidden="true" /></span><div>InboxFS<small>Local file desk</small></div></div>
+      <nav aria-label="File views">
+        <p className="nav-label">Library</p>
+        {categories.map((item) => <button key={item} className={category === item ? "active" : ""} onClick={() => { setCategory(item); document.getElementById("files")?.scrollIntoView(); }}>
+          {item === "All files" ? <FolderInput size={17} aria-hidden="true" /> : item === "Duplicates" ? <Copy size={17} aria-hidden="true" /> : <FolderClosed size={17} aria-hidden="true" />}
+          <span>{item}</span><b>{categoryCount(item)}</b>
+        </button>)}
+        <p className="nav-label nav-label-secondary">Workspace</p>
+        <button onClick={() => document.getElementById("activity")?.scrollIntoView()}><History size={17} aria-hidden="true" /><span>Activity</span></button>
       </nav>
-      <div className="privacy"><ShieldCheck size={18} /><div><strong>Local by default</strong><small>Files never leave this computer.</small></div></div>
+      <div className="privacy"><ShieldCheck size={18} aria-hidden="true" /><div><strong>On-device only</strong><small>Nothing is uploaded.</small></div></div>
     </aside>
-    <main>
-      <header><div><h1>File inbox</h1><p title={scan?.root}>{scan?.root ?? "Scanning..."}</p></div><button className="icon" title="Scan again" onClick={() => { setNotice(""); void refresh(); }} disabled={busy}><RefreshCw size={18} className={busy ? "spin" : ""} /></button></header>
-      <section className="summary">
-        <div><small>Ready to organize</small><strong>{scan?.suggestions.length ?? 0}</strong></div>
-        <div><small>Selected size</small><strong>{formatSize((scan?.suggestions ?? []).filter(x => selected.has(x.id)).reduce((n, x) => n + x.size, 0))}</strong></div>
-        <div><small>Duplicates held back</small><strong>{duplicateCount}</strong></div>
+
+    <main id="main-content">
+      <header className="topbar">
+        <div className="page-title"><span className="eyebrow">Workspace</span><h1>File inbox</h1><p title={scan?.root}><HardDrive size={14} aria-hidden="true" />{scan?.root ?? "Scanning folder..."}</p></div>
+        <div className="scan-status">
+          <span className="status-dot" aria-hidden="true" />
+          <div><strong>{busy ? "Scanning" : "Watching"}</strong><small>{scan ? `Updated ${new Date(scan.scannedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Connecting"}</small></div>
+          <button className="icon-button" aria-label="Scan folder again" title="Scan again" onClick={() => { setNotice(""); void refresh(); }} disabled={busy}><RefreshCw size={18} className={busy ? "spin" : ""} /></button>
+        </div>
+      </header>
+
+      <section className="summary" aria-label="Inbox summary">
+        <div><span className="metric-icon metric-ready"><Files size={18} aria-hidden="true" /></span><span><small>Ready</small><strong>{scan?.suggestions.length ?? 0}<em> files</em></strong></span></div>
+        <div><span className="metric-icon metric-size"><HardDrive size={18} aria-hidden="true" /></span><span><small>Selected</small><strong>{formatSize(selectedSize)}</strong></span></div>
+        <div><span className="metric-icon metric-duplicate"><Copy size={18} aria-hidden="true" /></span><span><small>Held back</small><strong>{duplicateCount}<em> duplicates</em></strong></span></div>
       </section>
-      <div className="toolbar">
-        <label><Search size={17} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Filter files" /></label>
-        <select value={category} onChange={e => setCategory(e.target.value)}>{categories.map(item => <option key={item}>{item}</option>)}</select>
-        <button className="primary" disabled={busy || !selected.size} onClick={() => void organize()}><ArchiveRestore size={17} /> Organize {selected.size}</button>
-      </div>
-      {notice && <div className="notice">{notice}</div>}
-      <section className="filelist">
-        <div className="listhead"><input type="checkbox" checked={filtered.length > 0 && filtered.every(x => selected.has(x.id))} onChange={e => setFilteredSelected(e.target.checked)} /><span>File</span><span>Destination</span><span>Size</span></div>
-        {filtered.map(item => <div className="row" key={item.id}>
-          <input type="checkbox" checked={selected.has(item.id)} onChange={e => setItemSelected(item.id, e.target.checked)} />
-          <div className="filename"><File size={18} /><span><strong>{item.name}</strong><small>{new Date(item.modifiedAt).toLocaleDateString()}</small></span></div>
-          <span className={item.duplicateOf ? "destination duplicate" : "destination"}>{item.duplicateOf ? <Copy size={14} /> : <Check size={14} />}{item.duplicateOf ? `Matches ${basename(item.duplicateOf)}` : item.category}</span><span>{formatSize(item.size)}</span>
-        </div>)}
-        {!busy && !filtered.length && <div className="empty"><Inbox size={28} /><strong>Inbox is clear</strong><span>No loose files match this view.</span></div>}
+
+      <section className="workspace" id="files" aria-labelledby="files-heading">
+        <div className="section-heading">
+          <div><h2 id="files-heading">{category}</h2><p>{filtered.length} of {scan?.suggestions.length ?? 0} files</p></div>
+          <label className="mobile-category"><span>View</span><select value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((item) => <option key={item}>{item}</option>)}</select></label>
+        </div>
+        <div className="toolbar">
+          <label className="search-field"><span className="sr-only">Search files</span><Search size={17} aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by file name" /></label>
+          {selected.size > 0 && <button className="clear-button" onClick={() => setFilteredSelected(false)}>Clear selection</button>}
+          <button className="primary" disabled={busy || !selected.size} onClick={() => void organize()}><ArchiveRestore size={17} aria-hidden="true" /><span>Organize {selected.size || "selected"}</span></button>
+        </div>
+
+        {notice && <div className="notice" role="status"><Check size={16} aria-hidden="true" /><span>{notice}</span></div>}
+        <div className="filelist" aria-busy={busy && !scan}>
+          <div className="listhead">
+            <label className="checkbox-cell"><input aria-label="Select all visible files" type="checkbox" checked={allFilteredSelected} onChange={(event) => setFilteredSelected(event.target.checked)} /></label>
+            <span>File</span><span>Destination</span><span>Size</span>
+          </div>
+          {!scan && Array.from({ length: 5 }, (_, index) => <div className="row skeleton-row" key={index} aria-hidden="true"><span /><span /><span /><span /></div>)}
+          {filtered.map((item) => <div className={`row${selected.has(item.id) ? " selected" : ""}`} key={item.id}>
+            <label className="checkbox-cell"><input aria-label={`Select ${item.name}`} type="checkbox" checked={selected.has(item.id)} onChange={(event) => setItemSelected(item.id, event.target.checked)} /></label>
+            <div className="filename"><span className="file-icon"><File size={18} aria-hidden="true" /></span><span><strong title={item.name}>{item.name}</strong><small><Clock3 size={12} aria-hidden="true" />{new Date(item.modifiedAt).toLocaleDateString()}</small></span></div>
+            <div className={item.duplicateOf ? "destination duplicate" : "destination"}>
+              <span>{item.duplicateOf ? <Copy size={13} aria-hidden="true" /> : <FolderClosed size={13} aria-hidden="true" />}{item.duplicateOf ? "Duplicate" : item.category}</span>
+              <small title={item.duplicateOf ?? item.destinationPath}>{item.duplicateOf ? `Matches ${basename(item.duplicateOf)}` : parentFolder(item.destinationPath)}</small>
+            </div>
+            <span className="file-size">{formatSize(item.size)}</span>
+          </div>)}
+          {scan && !busy && !filtered.length && <div className="empty"><span><Inbox size={25} aria-hidden="true" /></span><strong>{query ? "No matching files" : "Inbox is clear"}</strong><p>{query ? "Try a different name or file view." : "No loose files match this view."}</p>{query && <button onClick={() => setQuery("")}>Clear search</button>}</div>}
+        </div>
       </section>
-      <section className="activity" id="activity"><div className="section-title"><h2>Recent activity</h2><span>{history.length} moves</span></div>
-        {history.slice(0, 8).map(record => <div className="history-row" key={record.id}><div><strong>{basename(record.destinationPath)}</strong><small>{record.undoneAt ? "Returned to inbox" : `Moved to ${basename(record.destinationPath.split(/[\\/]/).slice(0, -1).join("/"))}`}</small></div><time>{new Date(record.createdAt).toLocaleString()}</time><button className="icon" title="Undo move" disabled={busy || Boolean(record.undoneAt)} onClick={() => void undo(record.id)}><Undo2 size={16} /></button></div>)}
-        {!history.length && <p className="muted">Organized files will appear here.</p>}
+
+      <section className="activity" id="activity" aria-labelledby="activity-heading">
+        <div className="section-heading"><div><h2 id="activity-heading">Recent activity</h2><p>{history.length} moves recorded</p></div></div>
+        <div className="history-list">
+          {history.slice(0, 8).map((record) => <div className="history-row" key={record.id}>
+            <span className="history-icon"><History size={16} aria-hidden="true" /></span>
+            <div><strong>{basename(record.destinationPath)}</strong><small>{record.undoneAt ? "Returned to inbox" : `Moved to ${parentFolder(record.destinationPath)}`}</small></div>
+            <time>{new Date(record.createdAt).toLocaleString()}</time>
+            <button className="icon-button" aria-label={`Undo move of ${basename(record.destinationPath)}`} title="Undo move" disabled={busy || Boolean(record.undoneAt)} onClick={() => void undo(record.id)}><Undo2 size={16} /></button>
+          </div>)}
+          {!history.length && <div className="activity-empty"><History size={18} aria-hidden="true" /><span>Organized files will appear here.</span></div>}
+        </div>
       </section>
     </main>
   </div>;

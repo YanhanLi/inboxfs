@@ -4,6 +4,8 @@ InboxFS is a local-first file inbox. It scans loose files in a folder, previews 
 
 It runs on `127.0.0.1`. File names and contents are not uploaded anywhere.
 
+![InboxFS file workspace](docs/inboxfs-workspace.png)
+
 ## Try it
 
 InboxFS requires Node.js 22.5 or newer.
@@ -33,10 +35,11 @@ npx github:YanhanLi/inboxfs ~/Desktop
 - refuses undo if the organized file changed or the original location became occupied;
 - rejects symbolic-link paths that would leave the selected inbox;
 - works in desktop and mobile-width browsers without a cloud account.
+- provides keyboard-friendly filters, search, bulk selection, and responsive file views.
 
 ## What it does not do yet
 
-InboxFS 0.1 uses deterministic file-extension rules. It does not inspect document contents, run OCR, watch folders continuously, or use an AI model. Those features will only be added when they preserve the preview-first and local-first behavior.
+InboxFS uses deterministic file-extension rules. It does not inspect document contents, run OCR, or use an AI model. Those features will only be added when they preserve the preview-first and local-first behavior.
 
 Undo history is stored as a private JSON file under `~/.inboxfs/`. Version 0.2 automatically migrates matching v0.1 history to collision-resistant per-directory ledgers. InboxFS is an organizer, not a backup system.
 
