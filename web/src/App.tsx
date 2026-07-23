@@ -10,9 +10,11 @@ import {
   HardDrive,
   History,
   Inbox,
+  Moon,
   RefreshCw,
   Search,
   ShieldCheck,
+  Sun,
   Undo2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -20,10 +22,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 interface Suggestion { id: string; name: string; category: string; size: number; modifiedAt: string; destinationPath: string; selected: boolean; duplicateOf?: string }
 interface Scan { root: string; scannedAt: string; suggestions: Suggestion[]; categoryCounts: Record<string, number>; totalSize: number }
 interface Record { id: string; createdAt: string; sourcePath: string; destinationPath: string; undoneAt?: string }
+type Theme = "light" | "dark";
 
 const formatSize = (bytes: number) => bytes < 1024 ? `${bytes} B` : bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`;
 const basename = (value: string) => value.split(/[\\/]/).pop() ?? value;
 const parentFolder = (value: string) => basename(value.split(/[\\/]/).slice(0, -1).join("/"));
+
+function initialTheme(): Theme {
+  try {
+    const saved = localStorage.getItem("inboxfs-theme");
+    if (saved === "light" || saved === "dark") return saved;
+  } catch { /* Use the system preference when storage is unavailable. */ }
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { headers: { "Content-Type": "application/json" }, ...init });
@@ -40,7 +51,14 @@ export function App() {
   const [category, setCategory] = useState("All files");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [theme, setTheme] = useState<Theme>(initialTheme);
   const selectionOverrides = useRef<Map<string, boolean>>(new Map());
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#151719" : "#f4f5f6");
+    try { localStorage.setItem("inboxfs-theme", theme); } catch { /* Theme still applies for this session. */ }
+  }, [theme]);
 
   const refresh = useCallback(async (preserveSelection = false) => {
     setBusy(true);
@@ -96,6 +114,13 @@ export function App() {
     });
   }
 
+  function toggleTheme() {
+    const next = theme === "light" ? "dark" : "light";
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem("inboxfs-theme", next); } catch { /* Theme still applies for this session. */ }
+    setTheme(next);
+  }
+
   async function organize() {
     if (!selected.size) return;
     setBusy(true); setNotice("");
@@ -134,6 +159,7 @@ export function App() {
         <div className="scan-status">
           <span className="status-dot" aria-hidden="true" />
           <div><strong>{busy ? "Scanning" : "Watching"}</strong><small>{scan ? `Updated ${new Date(scan.scannedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Connecting"}</small></div>
+          <button className="icon-button" aria-label={`Use ${theme === "light" ? "dark" : "light"} theme`} title={`Use ${theme === "light" ? "dark" : "light"} theme`} onClick={toggleTheme}>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</button>
           <button className="icon-button" aria-label="Scan folder again" title="Scan again" onClick={() => { setNotice(""); void refresh(); }} disabled={busy}><RefreshCw size={18} className={busy ? "spin" : ""} /></button>
         </div>
       </header>
@@ -167,7 +193,7 @@ export function App() {
             <div className="filename"><span className="file-icon"><File size={18} aria-hidden="true" /></span><span><strong title={item.name}>{item.name}</strong><small><Clock3 size={12} aria-hidden="true" />{new Date(item.modifiedAt).toLocaleDateString()}</small></span></div>
             <div className={item.duplicateOf ? "destination duplicate" : "destination"}>
               <span>{item.duplicateOf ? <Copy size={13} aria-hidden="true" /> : <FolderClosed size={13} aria-hidden="true" />}{item.duplicateOf ? "Duplicate" : item.category}</span>
-              <small title={item.duplicateOf ?? item.destinationPath}>{item.duplicateOf ? `Matches ${basename(item.duplicateOf)}` : parentFolder(item.destinationPath)}</small>
+              {item.duplicateOf && <small title={item.duplicateOf}>{`Matches ${basename(item.duplicateOf)}`}</small>}
             </div>
             <span className="file-size">{formatSize(item.size)}</span>
           </div>)}

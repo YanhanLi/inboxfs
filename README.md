@@ -4,7 +4,10 @@ InboxFS is a local-first file inbox. It scans loose files in a folder, previews 
 
 It runs on `127.0.0.1`. File names and contents are not uploaded anywhere.
 
-![InboxFS file workspace](docs/inboxfs-workspace.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/inboxfs-workspace-dark.png">
+  <img alt="InboxFS file workspace" src="docs/inboxfs-workspace.png">
+</picture>
 
 ## Try it
 
@@ -36,6 +39,7 @@ npx github:YanhanLi/inboxfs ~/Desktop
 - rejects symbolic-link paths that would leave the selected inbox;
 - works in desktop and mobile-width browsers without a cloud account.
 - provides keyboard-friendly filters, search, bulk selection, and responsive file views.
+- follows the system light or dark theme and remembers manual theme changes locally.
 
 ## What it does not do yet
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0
+
+- Add complete light and dark themes with a compact header switch.
+- Start from the saved theme or operating-system preference without a light-mode flash.
+- Persist theme changes locally, including across an immediate refresh.
+- Move component colors onto semantic tokens with independently tuned dark-mode contrast.
+- Remove redundant destination text from ordinary file rows.
+- Add adaptive light and dark workspace screenshots to the repository README.
+
 ## 0.3.1
 
 - Reserve green for selection, success, and the primary organize action.
