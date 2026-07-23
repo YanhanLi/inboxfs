@@ -18,10 +18,14 @@ import {
   Inbox,
   MapPin,
   Moon,
+  Plus,
   RefreshCw,
+  Save,
   Search,
+  SlidersHorizontal,
   ShieldCheck,
   Sun,
+  Trash2,
   Undo2,
   X,
 } from "lucide-react";
@@ -30,12 +34,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 interface Suggestion { id: string; name: string; extension: string; category: string; size: number; modifiedAt: string; sourcePath: string; destinationPath: string; classification: { type: "custom" | "extension" | "fallback"; pattern: string; explanation: string; ruleName?: string; source?: string }; selected: boolean; duplicateOf?: string; duplicateHash?: string }
 interface Scan { root: string; scannedAt: string; suggestions: Suggestion[]; categoryCounts: Record<string, number>; totalSize: number; ruleConfig: { customRuleCount: number; source?: string } }
 interface Record { id: string; createdAt: string; sourcePath: string; destinationPath: string; undoneAt?: string }
+interface RuleDocument { name: string; destination: string; extensions: string[] }
+interface ConfigDocument { version: 1; rules: RuleDocument[] }
+interface RuleDraft { id: string; name: string; destination: string; extensions: string }
 type Theme = "light" | "dark";
 type SortOption = "name-asc" | "modified-desc" | "size-desc" | "destination-asc";
 
 const formatSize = (bytes: number) => bytes < 1024 ? `${bytes} B` : bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`;
 const basename = (value: string) => value.split(/[\\/]/).pop() ?? value;
 const parentFolder = (value: string) => basename(value.split(/[\\/]/).slice(0, -1).join("/"));
+let ruleSequence = 0;
+const draftRule = (rule?: RuleDocument): RuleDraft => ({ id: `rule-${Date.now()}-${ruleSequence++}`, name: rule?.name ?? "", destination: rule?.destination ?? "", extensions: rule?.extensions.join(", ") ?? "" });
 
 function initialTheme(): Theme {
   try {
@@ -64,8 +73,14 @@ export function App() {
   const [notice, setNotice] = useState("");
   const [scanError, setScanError] = useState("");
   const [theme, setTheme] = useState<Theme>(initialTheme);
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const [ruleDrafts, setRuleDrafts] = useState<RuleDraft[]>([]);
+  const [rulesBusy, setRulesBusy] = useState(false);
+  const [rulesDirty, setRulesDirty] = useState(false);
+  const [rulesError, setRulesError] = useState("");
   const selectionOverrides = useRef<Map<string, boolean>>(new Map());
   const inspectorRef = useRef<HTMLDialogElement>(null);
+  const rulesRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -77,6 +92,11 @@ export function App() {
     if (inspectedId && inspector && !inspector.open) inspector.showModal();
     if (!inspectedId && inspector?.open) inspector.close();
   }, [inspectedId]);
+  useEffect(() => {
+    const dialog = rulesRef.current;
+    if (rulesOpen && dialog && !dialog.open) dialog.showModal();
+    if (!rulesOpen && dialog?.open) dialog.close();
+  }, [rulesOpen]);
   useEffect(() => {
     if (scan && inspectedId && !scan.suggestions.some((item) => item.id === inspectedId)) setInspectedId(undefined);
   }, [scan, inspectedId]);
@@ -151,6 +171,55 @@ export function App() {
     setTheme(next);
   }
 
+  async function openRules() {
+    setInspectedId(undefined);
+    setRulesOpen(true);
+    setRulesBusy(true);
+    setRulesError("");
+    try {
+      const config = await json<ConfigDocument>("/api/config");
+      setRuleDrafts(config.rules.map((rule) => draftRule(rule)));
+      setRulesDirty(false);
+    } catch (error) {
+      setRuleDrafts([]);
+      setRulesError(error instanceof Error ? error.message : "Unable to open custom rules");
+    } finally { setRulesBusy(false); }
+  }
+
+  function closeRules() {
+    if (rulesDirty && !window.confirm("Discard unsaved rule changes?")) return;
+    setRulesOpen(false);
+    setRulesDirty(false);
+    setRulesError("");
+  }
+
+  function updateRule(id: string, field: keyof Omit<RuleDraft, "id">, value: string) {
+    setRuleDrafts((current) => current.map((rule) => rule.id === id ? { ...rule, [field]: value } : rule));
+    setRulesDirty(true);
+    setRulesError("");
+  }
+
+  async function saveRules(drafts = ruleDrafts) {
+    setRulesBusy(true);
+    setRulesError("");
+    try {
+      const config = await json<ConfigDocument>("/api/config", {
+        method: "PUT",
+        body: JSON.stringify({ version: 1, rules: drafts.map(({ name, destination, extensions }) => ({ name, destination, extensions: extensions.split(",").map((value) => value.trim()).filter(Boolean) })) }),
+      });
+      setRuleDrafts(config.rules.map((rule) => draftRule(rule)));
+      setRulesDirty(false);
+      setRulesOpen(false);
+      setNotice(`${config.rules.length} custom rule${config.rules.length === 1 ? "" : "s"} saved.`);
+      await refresh(true);
+    } catch (error) { setRulesError(error instanceof Error ? error.message : "Unable to save custom rules"); }
+    finally { setRulesBusy(false); }
+  }
+
+  function replaceBrokenConfig() {
+    if (window.confirm("Replace the unreadable configuration with an empty rule set?")) void saveRules([]);
+  }
+
   async function organize() {
     if (!selected.size) return;
     setBusy(true); setNotice("");
@@ -178,6 +247,7 @@ export function App() {
           <span>{item}</span><b>{categoryCount(item)}</b>
         </button>)}
         <p className="nav-label nav-label-secondary">Workspace</p>
+        <button onClick={() => void openRules()}><SlidersHorizontal size={17} aria-hidden="true" /><span>Rules</span><b>{scan?.ruleConfig.customRuleCount ?? 0}</b></button>
         <button onClick={() => document.getElementById("activity")?.scrollIntoView()}><History size={17} aria-hidden="true" /><span>Activity</span></button>
       </nav>
       <div className="privacy"><ShieldCheck size={18} aria-hidden="true" /><div><strong>On-device only</strong><small>Nothing is uploaded.</small></div></div>
@@ -189,6 +259,7 @@ export function App() {
         <div className="scan-status">
           <span className="status-dot" aria-hidden="true" />
           <div><strong>{busy ? "Scanning" : "Watching"}</strong><small>{scan ? `Updated ${new Date(scan.scannedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Connecting"}</small></div>
+          <button className="icon-button mobile-rules-button" aria-label="Edit classification rules" title="Edit rules" onClick={() => void openRules()}><SlidersHorizontal size={18} /></button>
           <button className="icon-button" aria-label={`Use ${theme === "light" ? "dark" : "light"} theme`} title={`Use ${theme === "light" ? "dark" : "light"} theme`} onClick={toggleTheme}>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</button>
           <button className="icon-button" aria-label="Scan folder again" title="Scan again" onClick={() => { setNotice(""); void refresh(); }} disabled={busy}><RefreshCw size={18} className={busy ? "spin" : ""} /></button>
         </div>
@@ -272,6 +343,26 @@ export function App() {
 
         <section className="inspector-section plan-control" aria-labelledby="plan-heading"><div><h3 id="plan-heading">Organization plan</h3><p>{selected.has(inspected.id) ? "Included in the next organization run." : inspected.duplicateOf ? "Held back because identical content already exists." : "Not included in the next organization run."}</p></div><label><span>{selected.has(inspected.id) ? "Included" : "Excluded"}</span><input type="checkbox" checked={selected.has(inspected.id)} onChange={(event) => setItemSelected(inspected.id, event.target.checked)} /></label></section>
       </div>}
+    </dialog>
+
+    <dialog className="rules-dialog" ref={rulesRef} aria-labelledby="rules-title" onCancel={(event) => { event.preventDefault(); closeRules(); }} onClose={() => setRulesOpen(false)}>
+      <form className="rules-panel" onSubmit={(event) => { event.preventDefault(); void saveRules(); }}>
+        <header className="rules-header"><div><span>Classification</span><h2 id="rules-title">Custom rules</h2></div><button type="button" className="icon-button" aria-label="Close custom rules" title="Close" onClick={closeRules}><X size={18} /></button></header>
+        <div className="rules-body" aria-busy={rulesBusy}>
+          {rulesBusy && !ruleDrafts.length && !rulesError && <div className="rules-loading"><RefreshCw className="spin" size={19} aria-hidden="true" /><span>Loading rules</span></div>}
+          {rulesError && <div className="rules-error" role="alert"><AlertTriangle size={16} aria-hidden="true" /><span>{rulesError}</span>{!ruleDrafts.length && <button type="button" onClick={replaceBrokenConfig}>Replace configuration</button>}</div>}
+          {!rulesBusy && !ruleDrafts.length && !rulesError && <div className="rules-empty"><SlidersHorizontal size={24} aria-hidden="true" /><strong>No custom rules</strong><button type="button" onClick={() => { setRuleDrafts([draftRule()]); setRulesDirty(true); }}>Add rule</button></div>}
+          {ruleDrafts.map((rule, index) => <fieldset className="rule-editor" key={rule.id} disabled={rulesBusy}>
+            <legend>Rule {index + 1}</legend>
+            <button type="button" className="rule-delete" aria-label={`Delete rule ${index + 1}`} title="Delete rule" onClick={() => { setRuleDrafts((current) => current.filter((item) => item.id !== rule.id)); setRulesDirty(true); setRulesError(""); }}><Trash2 size={16} /></button>
+            <label><span>Name</span><input value={rule.name} maxLength={80} required onChange={(event) => updateRule(rule.id, "name", event.target.value)} placeholder="Reading" /></label>
+            <label><span>Destination</span><input value={rule.destination} maxLength={100} required onChange={(event) => updateRule(rule.id, "destination", event.target.value)} placeholder="Reading" /></label>
+            <label className="rule-extensions"><span>Extensions</span><input value={rule.extensions} required onChange={(event) => updateRule(rule.id, "extensions", event.target.value)} placeholder="epub, mobi, pdf" /></label>
+          </fieldset>)}
+          {ruleDrafts.length > 0 && <button type="button" className="add-rule" disabled={rulesBusy || ruleDrafts.length >= 100} onClick={() => { setRuleDrafts((current) => [...current, draftRule()]); setRulesDirty(true); }}><Plus size={16} aria-hidden="true" />Add rule</button>}
+        </div>
+        <footer className="rules-footer"><button type="button" className="secondary-button" onClick={closeRules}>Cancel</button><button type="submit" className="primary" disabled={rulesBusy || !rulesDirty}><Save size={16} aria-hidden="true" />{rulesBusy ? "Saving" : "Save rules"}</button></footer>
+      </form>
     </dialog>
   </div>;
 }

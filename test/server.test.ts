@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import request from "supertest";
@@ -30,6 +30,39 @@ describe("local HTTP boundary", () => {
     expect(response.body.error).toBe(".inboxfs.json contains invalid JSON.");
   });
 
+  it("reads and atomically saves normalized custom rules", async () => {
+    const { root, app } = await fixture();
+    await request(app).get("/api/config").expect(200, { version: 1, rules: [] });
+
+    const response = await request(app).put("/api/config").send({
+      version: 1,
+      rules: [{ name: "Reading", destination: "Reading", extensions: [".TXT", "pdf"] }],
+    }).expect(200);
+
+    expect(response.body.rules[0].extensions).toEqual(["txt", "pdf"]);
+    expect(JSON.parse(await readFile(path.join(root, ".inboxfs.json"), "utf8"))).toEqual(response.body);
+    const scan = await request(app).get("/api/scan").expect(200);
+    expect(scan.body.suggestions[0].category).toBe("Reading");
+  });
+
+  it("rejects unsafe rule writes", async () => {
+    const { app } = await fixture();
+    const response = await request(app).put("/api/config").send({
+      version: 1,
+      rules: [{ name: "Escape", destination: "../outside", extensions: ["txt"] }],
+    }).expect(409);
+    expect(response.body.error).toContain("safe, visible folder name");
+  });
+
+  it("does not replace a symbolic-link configuration", async () => {
+    const { root, app } = await fixture();
+    const target = path.join(root, "target.json");
+    await writeFile(target, "unchanged");
+    await symlink(target, path.join(root, ".inboxfs.json"));
+    await request(app).put("/api/config").send({ version: 1, rules: [] }).expect(409);
+    expect(await readFile(target, "utf8")).toBe("unchanged");
+  });
+
   it("rejects a non-loopback Host header", async () => {
     const { app } = await fixture();
     await request(app).get("/api/scan").set("Host", "malicious.example").expect(403);
@@ -38,5 +71,6 @@ describe("local HTTP boundary", () => {
   it("rejects cross-origin mutations", async () => {
     const { app } = await fixture();
     await request(app).post("/api/organize").set("Origin", "https://malicious.example").send({ ids: [] }).expect(403);
+    await request(app).put("/api/config").set("Origin", "https://malicious.example").send({ version: 1, rules: [] }).expect(403);
   });
 });

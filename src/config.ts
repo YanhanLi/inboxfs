@@ -1,5 +1,17 @@
-import { lstat, readFile } from "node:fs/promises";
+import { lstat, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
+
+export interface RuleDocument {
+  name: string;
+  destination: string;
+  extensions: string[];
+}
+
+export interface ConfigDocument {
+  version: 1;
+  rules: RuleDocument[];
+}
 
 export interface CustomRule {
   name: string;
@@ -12,7 +24,7 @@ export interface InboxConfig {
   source?: string;
 }
 
-const CONFIG_NAME = ".inboxfs.json";
+export const CONFIG_NAME = ".inboxfs.json";
 const MAX_CONFIG_BYTES = 64 * 1024;
 const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i;
 
@@ -44,21 +56,7 @@ function extensionName(value: unknown, index: number): string {
   return extension;
 }
 
-export async function readInboxConfig(root: string): Promise<InboxConfig> {
-  const configPath = path.join(root, CONFIG_NAME);
-  let contents: string;
-  try {
-    const metadata = await lstat(configPath);
-    if (!metadata.isFile() || metadata.isSymbolicLink()) throw new Error(`${CONFIG_NAME} must be a regular file.`);
-    if (metadata.size > MAX_CONFIG_BYTES) throw new Error(`${CONFIG_NAME} must be 64 KB or smaller.`);
-    contents = await readFile(configPath, "utf8");
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { rules: [] };
-    throw error;
-  }
-
-  let input: unknown;
-  try { input = JSON.parse(contents); } catch { throw new Error(`${CONFIG_NAME} contains invalid JSON.`); }
+export function parseInboxConfig(input: unknown, source?: string): InboxConfig {
   if (!object(input) || input.version !== 1 || !Array.isArray(input.rules)) {
     throw new Error(`${CONFIG_NAME} must contain { "version": 1, "rules": [...] }.`);
   }
@@ -85,5 +83,59 @@ export async function readInboxConfig(root: string): Promise<InboxConfig> {
     return { name, destination, extensions: normalized };
   });
 
-  return { rules, source: CONFIG_NAME };
+  return { rules, source };
+}
+
+export function configDocument(config: InboxConfig): ConfigDocument {
+  return {
+    version: 1,
+    rules: config.rules.map((rule) => ({
+      name: rule.name,
+      destination: rule.destination,
+      extensions: [...rule.extensions],
+    })),
+  };
+}
+
+export async function readInboxConfig(root: string): Promise<InboxConfig> {
+  const configPath = path.join(root, CONFIG_NAME);
+  let contents: string;
+  try {
+    const metadata = await lstat(configPath);
+    if (!metadata.isFile() || metadata.isSymbolicLink()) throw new Error(`${CONFIG_NAME} must be a regular file.`);
+    if (metadata.size > MAX_CONFIG_BYTES) throw new Error(`${CONFIG_NAME} must be 64 KB or smaller.`);
+    contents = await readFile(configPath, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { rules: [] };
+    throw error;
+  }
+
+  let input: unknown;
+  try { input = JSON.parse(contents); } catch { throw new Error(`${CONFIG_NAME} contains invalid JSON.`); }
+  return parseInboxConfig(input, CONFIG_NAME);
+}
+
+export async function writeInboxConfig(root: string, input: unknown): Promise<InboxConfig> {
+  const canonicalRoot = await realpath(root);
+  const configPath = path.join(canonicalRoot, CONFIG_NAME);
+  const config = parseInboxConfig(input, CONFIG_NAME);
+  const contents = `${JSON.stringify(configDocument(config), null, 2)}\n`;
+  if (Buffer.byteLength(contents) > MAX_CONFIG_BYTES) throw new Error(`${CONFIG_NAME} must be 64 KB or smaller.`);
+
+  try {
+    const metadata = await lstat(configPath);
+    if (!metadata.isFile() || metadata.isSymbolicLink()) throw new Error(`${CONFIG_NAME} must be a regular file.`);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+
+  const temporaryPath = path.join(canonicalRoot, `${CONFIG_NAME}.${process.pid}.${randomUUID()}.tmp`);
+  try {
+    await writeFile(temporaryPath, contents, { encoding: "utf8", mode: 0o600, flag: "wx" });
+    await rename(temporaryPath, configPath);
+  } catch (error) {
+    await rm(temporaryPath, { force: true });
+    throw error;
+  }
+  return config;
 }

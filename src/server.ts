@@ -6,6 +6,7 @@ import { readLedger, resolveLedgerPath } from "./ledger.js";
 import { organizeFiles, undoMove } from "./organizer.js";
 import { scanInbox } from "./scanner.js";
 import { MutationLock } from "./mutation-lock.js";
+import { configDocument, readInboxConfig, writeInboxConfig } from "./config.js";
 
 export function createApp(root: string, webRoot?: string) {
   const app = express();
@@ -30,6 +31,9 @@ export function createApp(root: string, webRoot?: string) {
   });
   app.get("/api/history", async (_request, response, next) => {
     try { response.json((await readLedger(await resolveLedgerPath(root))).slice().reverse()); } catch (error) { next(error); }
+  });
+  app.get("/api/config", async (_request, response, next) => {
+    try { response.json(configDocument(await readInboxConfig(root))); } catch (error) { next(error); }
   });
   app.get("/api/events", (request, response) => {
     response.setHeader("Content-Type", "text/event-stream");
@@ -59,6 +63,12 @@ export function createApp(root: string, webRoot?: string) {
   });
   app.post("/api/undo/:id", async (request, response, next) => {
     try { response.json({ record: await mutationLock.run(() => undoMove(root, request.params.id)) }); } catch (error) { next(error); }
+  });
+  app.put("/api/config", async (request, response, next) => {
+    try {
+      const config = await mutationLock.run(() => writeInboxConfig(root, request.body));
+      response.json(configDocument(config));
+    } catch (error) { next(error); }
   });
 
   const assets = webRoot ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../web-dist");

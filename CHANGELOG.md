@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.0
+
+- Add a responsive custom-rule editor for creating, updating, and deleting extension rules without hand-editing JSON.
+- Expose loopback-only configuration read and write endpoints protected by the existing same-origin boundary and mutation lock.
+- Reuse one validation path for direct files and editor submissions, including duplicate extensions and unsafe destinations.
+- Normalize and atomically save versioned configuration files with private permissions and temporary-file cleanup.
+- Reject symbolic-link configuration writes and preserve the last valid file when validation fails.
+- Refresh classifications and destination previews immediately after a successful save.
+- Add desktop and mobile dark-mode browser coverage for the editor, validation errors, and saved rule behavior.
+
 ## 0.6.0
 
 - Load deterministic custom extension rules from a watched `.inboxfs.json` file in the inbox root.

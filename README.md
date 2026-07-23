@@ -43,10 +43,13 @@ npx github:YanhanLi/inboxfs ~/Desktop
 - works in desktop and mobile-width browsers without a cloud account;
 - provides keyboard-friendly filters, search, bulk selection, and responsive file views;
 - follows the system light or dark theme and remembers manual theme changes locally.
+- creates, edits, validates, and removes custom extension rules from the responsive workspace.
 
 ## Custom rules
 
-Add a `.inboxfs.json` file to the folder being scanned to override built-in extension categories:
+Choose **Rules** in the workspace to create and edit custom extension categories. InboxFS validates the complete rule set before atomically saving `.inboxfs.json` in the folder being scanned.
+
+The same versioned file can also be edited directly:
 
 ```json
 {
@@ -68,7 +71,7 @@ Add a `.inboxfs.json` file to the folder being scanned to override built-in exte
 
 Custom rules take precedence over built-in categories. Extensions are case-insensitive and may include a leading dot. Each extension can belong to only one custom rule, and destinations must be single visible folder names without path separators. InboxFS rejects invalid, ambiguous, oversized, or symbolic-link configurations.
 
-The workspace watches `.inboxfs.json` for changes. Updating a destination invalidates the previous preview, so a stale organization plan cannot silently move files using a new rule.
+The workspace watches `.inboxfs.json` for changes. Saving a destination immediately refreshes the preview and invalidates the previous suggestion IDs, so a stale organization plan cannot silently move files using a new rule.
 
 ## What it does not do yet
 
