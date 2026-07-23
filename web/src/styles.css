@@ -35,6 +35,9 @@
   --notice-bg: #edf7f1;
   --notice-border: #b8d8c7;
   --notice-text: #155e43;
+  --danger: #b42318;
+  --danger-soft: #fef3f2;
+  --danger-border: #f3b7b2;
   --empty-text: #41484e;
   --shadow: #18212a0a;
   --focus: #2684ff;
@@ -74,6 +77,9 @@
   --notice-bg: #173429;
   --notice-border: #2e6e53;
   --notice-text: #9ad7b8;
+  --danger: #ffb4ab;
+  --danger-soft: #3b211f;
+  --danger-border: #7d3c36;
   --empty-text: #c5cbd0;
   --shadow: #0004;
   --focus: #58a6ff;
@@ -163,6 +169,8 @@ h1 { font-size: 26px; line-height: 1.2; letter-spacing: 0; }
 .plan-summary small { color: var(--text-muted); font-size: 10px; }
 .plan-summary > span { margin-left: auto; padding: 4px 7px; border-radius: 4px; background: var(--amber-soft); color: var(--amber-text); display: flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; white-space: nowrap; }
 .notice { min-height: 42px; margin-bottom: 10px; padding: 9px 12px; border: 1px solid var(--notice-border); border-radius: var(--radius); background: var(--notice-bg); color: var(--notice-text); display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.scan-error { min-height: 42px; margin-bottom: 10px; padding: 9px 12px; border: 1px solid var(--danger-border); border-radius: var(--radius); background: var(--danger-soft); color: var(--danger); display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.scan-error svg { flex: 0 0 auto; }
 
 .filelist { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); box-shadow: 0 1px 2px var(--shadow); }
 .listhead, .row { display: grid; grid-template-columns: 46px minmax(240px, 1.6fr) minmax(180px, 1fr) 90px 44px; align-items: center; padding: 0 10px 0 15px; }
@@ -194,6 +202,7 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--primary)
 .empty strong { color: var(--empty-text); font-size: 14px; }
 .empty p { margin-top: 5px; font-size: 12px; }
 .empty button { min-height: 44px; margin-top: 8px; border: 0; background: transparent; color: var(--green); font-size: 12px; font-weight: 700; }
+.error-empty > span { background: var(--danger-soft); color: var(--danger); }
 
 .activity { margin-top: 38px; }
 .history-list { border-top: 1px solid var(--border); }
@@ -226,7 +235,9 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--primary)
 .inspector-section-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .rule-section p, .duplicate-section p, .plan-control p { margin-top: 10px; color: var(--text-muted); font-size: 11px; line-height: 1.55; }
 .rule-badge { max-width: 160px; padding: 4px 7px; border-radius: 4px; overflow: hidden; background: var(--green-soft); color: var(--green); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.rule-badge.custom { background: var(--blue-soft); color: var(--blue); }
 .rule-badge.fallback { background: var(--amber-soft); color: var(--amber-text); }
+.rule-source { margin-top: 12px; color: var(--blue); display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 700; }
 .duplicate-section { background: color-mix(in srgb, var(--amber-soft) 45%, var(--surface)); }
 .duplicate-section p { overflow-wrap: anywhere; }
 .duplicate-section code { margin-top: 12px; padding: 7px 8px; border-radius: 4px; overflow-wrap: anywhere; background: var(--neutral-soft); color: var(--text-secondary); display: flex; align-items: start; gap: 6px; font-size: 9px; line-height: 1.5; }

@@ -40,9 +40,35 @@ npx github:YanhanLi/inboxfs ~/Desktop
 - records a SHA-256 hash for each move and offers per-file undo;
 - refuses undo if the organized file changed or the original location became occupied;
 - rejects symbolic-link paths that would leave the selected inbox;
-- works in desktop and mobile-width browsers without a cloud account.
-- provides keyboard-friendly filters, search, bulk selection, and responsive file views.
+- works in desktop and mobile-width browsers without a cloud account;
+- provides keyboard-friendly filters, search, bulk selection, and responsive file views;
 - follows the system light or dark theme and remembers manual theme changes locally.
+
+## Custom rules
+
+Add a `.inboxfs.json` file to the folder being scanned to override built-in extension categories:
+
+```json
+{
+  "version": 1,
+  "rules": [
+    {
+      "name": "Research papers",
+      "extensions": ["pdf", "epub"],
+      "destination": "Research"
+    },
+    {
+      "name": "Course data",
+      "extensions": ["csv", "xlsx"],
+      "destination": "Coursework"
+    }
+  ]
+}
+```
+
+Custom rules take precedence over built-in categories. Extensions are case-insensitive and may include a leading dot. Each extension can belong to only one custom rule, and destinations must be single visible folder names without path separators. InboxFS rejects invalid, ambiguous, oversized, or symbolic-link configurations.
+
+The workspace watches `.inboxfs.json` for changes. Updating a destination invalidates the previous preview, so a stale organization plan cannot silently move files using a new rule.
 
 ## What it does not do yet
 

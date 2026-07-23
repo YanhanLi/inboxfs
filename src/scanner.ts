@@ -2,16 +2,18 @@ import { createHash } from "node:crypto";
 import { readdir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { explainClassification, extensionOf } from "./classifier.js";
+import { readInboxConfig } from "./config.js";
 import { availableDestination } from "./path-safety.js";
 import type { FileSuggestion, ScanResult } from "./model.js";
 import { hashFile } from "./file-hash.js";
 
-function suggestionId(sourcePath: string, modifiedMs: number, size: number): string {
-  return createHash("sha256").update(`${sourcePath}\0${modifiedMs}\0${size}`).digest("hex").slice(0, 16);
+function suggestionId(sourcePath: string, modifiedMs: number, size: number, destinationPath: string): string {
+  return createHash("sha256").update(`${sourcePath}\0${modifiedMs}\0${size}\0${destinationPath}`).digest("hex").slice(0, 16);
 }
 
 export async function scanInbox(root: string): Promise<ScanResult> {
   const canonicalRoot = await realpath(root);
+  const config = await readInboxConfig(canonicalRoot);
   const entries = await readdir(canonicalRoot, { withFileTypes: true });
   const occupied = new Set(entries.map((entry) => path.join(canonicalRoot, entry.name)));
   const suggestions: FileSuggestion[] = [];
@@ -43,7 +45,7 @@ export async function scanInbox(root: string): Promise<ScanResult> {
     if (!entry.isFile() || entry.isSymbolicLink() || entry.name.startsWith(".")) continue;
     const sourcePath = path.join(canonicalRoot, entry.name);
     const metadata = await stat(sourcePath);
-    const { category, classification } = explainClassification(entry.name);
+    const { category, classification } = explainClassification(entry.name, config.rules);
     const candidate = path.join(canonicalRoot, category, entry.name);
     const destinationPath = availableDestination(candidate, occupied);
     occupied.add(destinationPath);
@@ -60,7 +62,7 @@ export async function scanInbox(root: string): Promise<ScanResult> {
       }
     }
     suggestions.push({
-      id: suggestionId(sourcePath, metadata.mtimeMs, metadata.size),
+      id: suggestionId(sourcePath, metadata.mtimeMs, metadata.size, destinationPath),
       name: entry.name,
       extension: extensionOf(entry.name),
       category,
@@ -85,6 +87,7 @@ export async function scanInbox(root: string): Promise<ScanResult> {
       counts[item.category] = (counts[item.category] ?? 0) + 1;
       return counts;
     }, {}),
-    totalSize: suggestions.reduce((sum, item) => sum + item.size, 0)
+    totalSize: suggestions.reduce((sum, item) => sum + item.size, 0),
+    ruleConfig: { customRuleCount: config.rules.length, source: config.source }
   };
 }

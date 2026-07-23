@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   ArchiveRestore,
   ArrowUpDown,
   Check,
@@ -26,8 +27,8 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-interface Suggestion { id: string; name: string; extension: string; category: string; size: number; modifiedAt: string; sourcePath: string; destinationPath: string; classification: { type: "extension" | "fallback"; pattern: string; explanation: string }; selected: boolean; duplicateOf?: string; duplicateHash?: string }
-interface Scan { root: string; scannedAt: string; suggestions: Suggestion[]; categoryCounts: Record<string, number>; totalSize: number }
+interface Suggestion { id: string; name: string; extension: string; category: string; size: number; modifiedAt: string; sourcePath: string; destinationPath: string; classification: { type: "custom" | "extension" | "fallback"; pattern: string; explanation: string; ruleName?: string; source?: string }; selected: boolean; duplicateOf?: string; duplicateHash?: string }
+interface Scan { root: string; scannedAt: string; suggestions: Suggestion[]; categoryCounts: Record<string, number>; totalSize: number; ruleConfig: { customRuleCount: number; source?: string } }
 interface Record { id: string; createdAt: string; sourcePath: string; destinationPath: string; undoneAt?: string }
 type Theme = "light" | "dark";
 type SortOption = "name-asc" | "modified-desc" | "size-desc" | "destination-asc";
@@ -61,6 +62,7 @@ export function App() {
   const [inspectedId, setInspectedId] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [scanError, setScanError] = useState("");
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const selectionOverrides = useRef<Map<string, boolean>>(new Map());
   const inspectorRef = useRef<HTMLDialogElement>(null);
@@ -84,6 +86,7 @@ export function App() {
     try {
       const [nextScan, nextHistory] = await Promise.all([json<Scan>("/api/scan"), json<Record[]>("/api/history")]);
       setScan(nextScan); setHistory(nextHistory);
+      setScanError("");
       if (!preserveSelection) selectionOverrides.current.clear();
       const available = new Set(nextScan.suggestions.map((item) => item.id));
       for (const id of selectionOverrides.current.keys()) {
@@ -92,7 +95,7 @@ export function App() {
       setSelected(new Set(nextScan.suggestions
         .filter((item) => selectionOverrides.current.get(item.id) ?? item.selected)
         .map((item) => item.id)));
-    } catch (error) { setNotice(error instanceof Error ? error.message : "Unable to scan folder"); }
+    } catch (error) { setScanError(error instanceof Error ? error.message : "Unable to scan folder"); }
     finally { setBusy(false); }
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
@@ -199,14 +202,14 @@ export function App() {
 
       <section className="workspace" id="files" aria-labelledby="files-heading">
         <div className="section-heading">
-          <div><h2 id="files-heading">{category}</h2><p>{filtered.length} of {scan?.suggestions.length ?? 0} files</p></div>
+          <div><h2 id="files-heading">{category}</h2><p>{filtered.length} of {scan?.suggestions.length ?? 0} files{scan?.ruleConfig.customRuleCount ? ` · ${scan.ruleConfig.customRuleCount} custom rule${scan.ruleConfig.customRuleCount === 1 ? "" : "s"}` : ""}</p></div>
           <label className="mobile-category"><span>View</span><select value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((item) => <option key={item}>{item}</option>)}</select></label>
         </div>
         <div className="toolbar">
           <label className="search-field"><span className="sr-only">Search files</span><Search size={17} aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by file name" /></label>
           <label className="sort-field"><span className="sr-only">Sort files</span><ArrowUpDown size={16} aria-hidden="true" /><select value={sort} onChange={(event) => setSort(event.target.value as SortOption)}><option value="name-asc">Name A-Z</option><option value="modified-desc">Newest first</option><option value="size-desc">Largest first</option><option value="destination-asc">Destination</option></select></label>
           {selected.size > 0 && <button className="clear-button" onClick={() => setFilteredSelected(false)}>Clear selection</button>}
-          <button className="primary" disabled={busy || !selected.size} onClick={() => void organize()}><ArchiveRestore size={17} aria-hidden="true" /><span>Organize {selected.size || "selected"}</span></button>
+          <button className="primary" disabled={busy || !selected.size || Boolean(scanError)} onClick={() => void organize()}><ArchiveRestore size={17} aria-hidden="true" /><span>Organize {selected.size || "selected"}</span></button>
         </div>
 
         <div className="plan-summary" aria-live="polite">
@@ -215,13 +218,14 @@ export function App() {
           {duplicateCount > 0 && <span><Copy size={13} aria-hidden="true" />{duplicateCount} held back</span>}
         </div>
 
+        {scanError && <div className="scan-error" role="alert"><AlertTriangle size={16} aria-hidden="true" /><span>{scanError}</span></div>}
         {notice && <div className="notice" role="status"><Check size={16} aria-hidden="true" /><span>{notice}</span></div>}
         <div className="filelist" aria-busy={busy && !scan}>
           <div className="listhead">
             <label className="checkbox-cell"><input aria-label="Select all visible files" type="checkbox" checked={allFilteredSelected} onChange={(event) => setFilteredSelected(event.target.checked)} /></label>
             <span>File</span><span>Destination</span><span>Size</span><span className="sr-only">Inspect</span>
           </div>
-          {!scan && Array.from({ length: 5 }, (_, index) => <div className="row skeleton-row" key={index} aria-hidden="true"><span /><span /><span /><span /></div>)}
+          {!scan && !scanError && Array.from({ length: 5 }, (_, index) => <div className="row skeleton-row" key={index} aria-hidden="true"><span /><span /><span /><span /></div>)}
           {visible.map((item) => <div className={`row${selected.has(item.id) ? " selected" : ""}${inspectedId === item.id ? " inspected" : ""}`} key={item.id}>
             <label className="checkbox-cell"><input aria-label={`Select ${item.name}`} type="checkbox" checked={selected.has(item.id)} onChange={(event) => setItemSelected(item.id, event.target.checked)} /></label>
             <div className="filename"><span className="file-icon"><File size={18} aria-hidden="true" /></span><span><strong title={item.name}>{item.name}</strong><small><Clock3 size={12} aria-hidden="true" />{new Date(item.modifiedAt).toLocaleDateString()}</small></span></div>
@@ -233,6 +237,7 @@ export function App() {
             <button className="row-action" aria-label={`Inspect ${item.name}`} title="Inspect file" onClick={() => setInspectedId(item.id)}><Info size={16} /></button>
           </div>)}
           {scan && !busy && !filtered.length && <div className="empty"><span><Inbox size={25} aria-hidden="true" /></span><strong>{query ? "No matching files" : "Inbox is clear"}</strong><p>{query ? "Try a different name or file view." : "No loose files match this view."}</p>{query && <button onClick={() => setQuery("")}>Clear search</button>}</div>}
+          {!scan && scanError && <div className="empty error-empty"><span><AlertTriangle size={25} aria-hidden="true" /></span><strong>Preview unavailable</strong><p>Fix the local rule file, then scan again.</p><button onClick={() => void refresh()}>Scan again</button></div>}
         </div>
       </section>
 
@@ -261,7 +266,7 @@ export function App() {
           <div><dt><Clock3 size={14} aria-hidden="true" />Modified</dt><dd>{new Date(inspected.modifiedAt).toLocaleString()}</dd></div>
         </dl></section>
 
-        <section className="inspector-section rule-section" aria-labelledby="rule-heading"><div className="inspector-section-title"><h3 id="rule-heading">Classification rule</h3><span className={inspected.classification.type === "fallback" ? "rule-badge fallback" : "rule-badge"}>{inspected.classification.pattern}</span></div><p>{inspected.classification.explanation}</p></section>
+        <section className="inspector-section rule-section" aria-labelledby="rule-heading"><div className="inspector-section-title"><h3 id="rule-heading">Classification rule</h3><span className={`rule-badge ${inspected.classification.type}`}>{inspected.classification.pattern}</span></div><p>{inspected.classification.explanation}</p>{inspected.classification.source && <small className="rule-source"><File size={13} aria-hidden="true" />{inspected.classification.ruleName} · {inspected.classification.source}</small>}</section>
 
         {inspected.duplicateOf && <section className="inspector-section duplicate-section" aria-labelledby="duplicate-heading"><h3 id="duplicate-heading">Duplicate match</h3><p title={inspected.duplicateOf}>{inspected.duplicateOf}</p>{inspected.duplicateHash && <code><Hash size={13} aria-hidden="true" />{inspected.duplicateHash}</code>}</section>}
 

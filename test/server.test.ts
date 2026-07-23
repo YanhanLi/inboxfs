@@ -23,6 +23,13 @@ describe("local HTTP boundary", () => {
     expect(response.body.suggestions[0].classification.pattern).toBe("*.txt");
   });
 
+  it("returns a clear conflict response for invalid local rules", async () => {
+    const { root, app } = await fixture();
+    await writeFile(path.join(root, ".inboxfs.json"), "invalid json");
+    const response = await request(app).get("/api/scan").expect(409);
+    expect(response.body.error).toBe(".inboxfs.json contains invalid JSON.");
+  });
+
   it("rejects a non-loopback Host header", async () => {
     const { app } = await fixture();
     await request(app).get("/api/scan").set("Host", "malicious.example").expect(403);

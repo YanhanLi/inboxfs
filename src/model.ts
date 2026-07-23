@@ -10,16 +10,18 @@ export type Category =
   | "Other";
 
 export interface ClassificationMatch {
-  type: "extension" | "fallback";
+  type: "custom" | "extension" | "fallback";
   pattern: string;
   explanation: string;
+  ruleName?: string;
+  source?: string;
 }
 
 export interface FileSuggestion {
   id: string;
   name: string;
   extension: string;
-  category: Category;
+  category: string;
   size: number;
   modifiedAt: string;
   sourcePath: string;
@@ -46,4 +48,8 @@ export interface ScanResult {
   suggestions: FileSuggestion[];
   categoryCounts: Record<string, number>;
   totalSize: number;
+  ruleConfig: {
+    customRuleCount: number;
+    source?: string;
+  };
 }

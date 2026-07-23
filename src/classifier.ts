@@ -1,4 +1,5 @@
 import path from "node:path";
+import type { CustomRule } from "./config.js";
 import type { Category, ClassificationMatch } from "./model.js";
 
 const GROUPS: Array<[Category, Set<string>]> = [
@@ -17,11 +18,24 @@ export function extensionOf(filename: string): string {
 }
 
 export function classify(filename: string): Category {
-  return explainClassification(filename).category;
+  return explainClassification(filename).category as Category;
 }
 
-export function explainClassification(filename: string): { category: Category; classification: ClassificationMatch } {
+export function explainClassification(filename: string, customRules: CustomRule[] = []): { category: string; classification: ClassificationMatch } {
   const extension = extensionOf(filename);
+  const custom = customRules.find((rule) => rule.extensions.has(extension));
+  if (custom) {
+    return {
+      category: custom.destination,
+      classification: {
+        type: "custom",
+        pattern: `*.${extension}`,
+        explanation: `Custom rule “${custom.name}” maps .${extension} files to ${custom.destination}.`,
+        ruleName: custom.name,
+        source: ".inboxfs.json"
+      }
+    };
+  }
   for (const [category, extensions] of GROUPS) {
     if (extensions.has(extension)) {
       return {

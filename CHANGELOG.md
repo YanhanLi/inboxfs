@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.0
+
+- Load deterministic custom extension rules from a watched `.inboxfs.json` file in the inbox root.
+- Route matching files to validated custom destination folders before applying built-in categories.
+- Show custom rule counts, names, patterns, sources, explanations, and destinations in the workspace.
+- Reject malformed, oversized, ambiguous, unsafe, or symbolic-link configuration files.
+- Include the resolved destination in suggestion IDs so changed rules invalidate stale organization plans.
+- Block organization and replace indefinite loading skeletons with a recoverable error state when configuration is invalid.
+- Document the versioned rule format and refresh adaptive README screenshots with a custom-rule workflow.
+
 ## 0.5.0
 
 - Add structured extension and fallback explanations to every scan suggestion.

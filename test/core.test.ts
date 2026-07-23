@@ -39,6 +39,69 @@ describe("InboxFS core", () => {
     ]);
   });
 
+  it("applies local custom extension rules before built-in rules", async () => {
+    const root = await inbox();
+    await writeFile(path.join(root, ".inboxfs.json"), JSON.stringify({ version: 1, rules: [{ name: "Research papers", extensions: [".pdf", "epub"], destination: "Research" }] }));
+    await writeFile(path.join(root, "paper.pdf"), "paper");
+    const scan = await scanInbox(root);
+    expect(scan.ruleConfig).toEqual({ customRuleCount: 1, source: ".inboxfs.json" });
+    expect(scan.suggestions[0]).toMatchObject({
+      category: "Research",
+      classification: {
+        type: "custom",
+        pattern: "*.pdf",
+        ruleName: "Research papers",
+        source: ".inboxfs.json"
+      }
+    });
+    expect(scan.suggestions[0].destinationPath.endsWith(path.join("Research", "paper.pdf"))).toBe(true);
+  });
+
+  it("rejects unsafe and ambiguous custom rules", async () => {
+    const root = await inbox();
+    await writeFile(path.join(root, ".inboxfs.json"), JSON.stringify({
+      version: 1,
+      rules: [
+        { name: "First", extensions: ["pdf"], destination: "../Outside" },
+        { name: "Second", extensions: ["pdf"], destination: "Research" }
+      ]
+    }));
+    await expect(scanInbox(root)).rejects.toThrow("safe, visible folder name");
+
+    await writeFile(path.join(root, ".inboxfs.json"), JSON.stringify({
+      version: 1,
+      rules: [
+        { name: "First", extensions: ["pdf"], destination: "Research" },
+        { name: "Second", extensions: [".pdf"], destination: "Papers" }
+      ]
+    }));
+    await expect(scanInbox(root)).rejects.toThrow("assigned to both");
+  });
+
+  it("invalidates a preview when its custom destination rule changes", async () => {
+    const root = await inbox();
+    const ledger = path.join(root, ".ledger.json");
+    const configPath = path.join(root, ".inboxfs.json");
+    await writeFile(configPath, JSON.stringify({ version: 1, rules: [{ name: "Research", extensions: ["pdf"], destination: "Research" }] }));
+    await writeFile(path.join(root, "paper.pdf"), "paper");
+    const scan = await scanInbox(root);
+    await writeFile(configPath, JSON.stringify({ version: 1, rules: [{ name: "Papers", extensions: ["pdf"], destination: "Papers" }] }));
+    await expect(organizeFiles(root, [scan.suggestions[0].id], ledger)).rejects.toThrow("changed since the preview");
+    expect(await readFile(path.join(root, "paper.pdf"), "utf8")).toBe("paper");
+  });
+
+  it("rejects malformed or symbolic-link configuration files", async () => {
+    const root = await inbox();
+    await writeFile(path.join(root, ".inboxfs.json"), "not json");
+    await expect(scanInbox(root)).rejects.toThrow("invalid JSON");
+
+    const target = path.join(await inbox(), "rules.json");
+    await writeFile(target, JSON.stringify({ version: 1, rules: [] }));
+    await rm(path.join(root, ".inboxfs.json"));
+    await symlink(target, path.join(root, ".inboxfs.json"));
+    await expect(scanInbox(root)).rejects.toThrow("regular file");
+  });
+
   it("moves selected files and restores unchanged content", async () => {
     const root = await inbox();
     const ledger = path.join(root, ".ledger.json");
