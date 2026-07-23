@@ -19,6 +19,18 @@ try {
   await page.screenshot({ path: path.resolve("docs/inboxfs-rules.png") });
 
   await page.getByRole("button", { name: "Close custom rules" }).click();
+  const aiButton = page.getByRole("button", { name: /^Local AI/ });
+  await aiButton.click();
+  const aiDialog = page.getByRole("dialog", { name: "Review unmatched files" });
+  await aiDialog.getByLabel("Enabled", { exact: true }).check();
+  await aiDialog.getByLabel("Allowed destinations", { exact: true }).fill("Projects, Archive");
+  await aiDialog.getByRole("button", { name: "Save configuration" }).click();
+  await aiDialog.getByRole("button", { name: "Analyze", exact: true }).click();
+  await aiDialog.getByText("Review suggestions", { exact: true }).waitFor();
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: path.resolve("docs/inboxfs-ai.png") });
+
+  await aiDialog.getByRole("button", { name: "Close local AI review" }).click();
   await page.getByRole("button", { name: "Use dark theme" }).click();
   await page.screenshot({ path: path.resolve("docs/inboxfs-workspace-dark.png"), fullPage: true });
 
@@ -26,6 +38,12 @@ try {
   await page.getByRole("dialog", { name: "Custom rules" }).waitFor();
   await page.waitForTimeout(300);
   await page.screenshot({ path: path.resolve("docs/inboxfs-rules-dark.png") });
+  await page.getByRole("button", { name: "Close custom rules" }).click();
+
+  await aiButton.click();
+  await page.getByRole("dialog", { name: "Review unmatched files" }).waitFor();
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: path.resolve("docs/inboxfs-ai-dark.png") });
 } finally {
   await browser.close();
 }

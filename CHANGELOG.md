@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.10.0
+
+- Add an optional, disabled-by-default local AI review for files that reach the deterministic fallback classification.
+- Connect only to the fixed Ollama loopback API, reject redirects and cloud-labelled model names, and constrain model output to a strict destination, confidence, and explanation schema.
+- Keep review read-only until users explicitly select and add suggestions to the ordinary plan; preserve fresh-scan validation, transactional organization, collision handling, and verified undo.
+- Support metadata-only review by default and separately opt-in, allowlisted plain-text reads capped at 32 KiB per file.
+- Add cancellable sequential jobs, per-file timeouts, confidence review states, destination correction, exact-name rule creation, and result provenance in the file inspector.
+- Cache only validated structured results in a private bounded file, keyed by model, destinations, prompt version, and hashed file context without storing paths or source text.
+- Add 42 unit and HTTP safety checks, eight desktop/mobile browser workflows, a 10,000-file preparation benchmark, and an optional 200-sample real-model evaluation command.
+
 ## 0.9.0
 
 - Introduce a backward-compatible `.inboxfs.json` v2 schema with ordered, enabled or disabled rules combining extensions, bounded file-name globs, and byte-size ranges.
