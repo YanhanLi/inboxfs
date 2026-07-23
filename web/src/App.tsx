@@ -24,9 +24,9 @@ import {
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { json } from "./api";
 
-const RulesDialog = lazy(() => import("./RulesDialog").then((module) => ({ default: module.RulesDialog })));
-const Inspector = lazy(() => import("./Inspector").then((module) => ({ default: module.Inspector })));
-const HistoryList = lazy(() => import("./HistoryList").then((module) => ({ default: module.HistoryList })));
+const RulesDialog = lazy(() => import("./RulesDialog"));
+const Inspector = lazy(() => import("./Inspector"));
+const HistoryList = lazy(() => import("./HistoryList"));
 
 interface Suggestion { id: string; name: string; extension: string; category: string; size: number; modifiedAt: string; sourcePath: string; destinationPath: string; classification: { type: "custom" | "extension" | "fallback"; pattern: string; explanation: string; ruleName?: string; source?: string }; selected: boolean; duplicateOf?: string; duplicateHash?: string }
 interface Scan { root: string; scannedAt: string; suggestions: Suggestion[]; categoryCounts: Record<string, number>; totalSize: number; ruleConfig: { customRuleCount: number; source?: string } }

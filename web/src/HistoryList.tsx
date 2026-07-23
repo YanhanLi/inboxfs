@@ -6,7 +6,7 @@ interface HistoryListProps { records: MoveRecord[]; busy: boolean; onUndo: (id: 
 const basename = (value: string) => value.split(/[\\/]/).pop() ?? value;
 const parentFolder = (value: string) => basename(value.split(/[\\/]/).slice(0, -1).join("/"));
 
-export function HistoryList({ records, busy, onUndo }: HistoryListProps) {
+export default function HistoryList({ records, busy, onUndo }: HistoryListProps) {
   return <>{records.slice(0, 8).map((record) => <div className="history-row" key={record.id}>
     <span className="history-icon"><History size={16} aria-hidden="true" /></span>
     <div><strong>{basename(record.destinationPath)}</strong><small>{record.undoneAt ? "Returned to inbox" : `Moved to ${parentFolder(record.destinationPath)}`}</small></div>

@@ -10,7 +10,7 @@ interface RulesDialogProps { onClose: () => void; onSaved: (count: number) => Pr
 let ruleSequence = 0;
 const draftRule = (rule?: RuleDocument): RuleDraft => ({ id: `rule-${Date.now()}-${ruleSequence++}`, name: rule?.name ?? "", destination: rule?.destination ?? "", extensions: rule?.extensions.join(", ") ?? "" });
 
-export function RulesDialog({ onClose, onSaved }: RulesDialogProps) {
+export default function RulesDialog({ onClose, onSaved }: RulesDialogProps) {
   const [drafts, setDrafts] = useState<RuleDraft[]>([]);
   const [busy, setBusy] = useState(true);
   const [dirty, setDirty] = useState(false);

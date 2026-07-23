@@ -23,7 +23,7 @@ interface InspectorProps {
 
 const formatSize = (bytes: number) => bytes < 1024 ? `${bytes} B` : bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`;
 
-export function Inspector({ item, included, onClose, onSelected }: InspectorProps) {
+export default function Inspector({ item, included, onClose, onSelected }: InspectorProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   useEffect(() => { dialogRef.current?.showModal(); }, []);
 
