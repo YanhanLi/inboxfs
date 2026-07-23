@@ -83,7 +83,8 @@ export class AiJobManager {
     for (const decision of decisions) {
       if (!decision || typeof decision !== "object" || Array.isArray(decision)) throw new Error("Each AI decision must contain an id and destination.");
       const value = decision as Record<string, unknown>;
-      if (typeof value.id !== "string" || typeof value.destination !== "string" || !results.has(value.id) || !job.destinations.includes(value.destination)) throw new Error("AI decision does not match the completed review job.");
+      const result = typeof value.id === "string" ? results.get(value.id) : undefined;
+      if (!result || result.status === "failed" || typeof value.destination !== "string" || !job.destinations.includes(value.destination)) throw new Error("AI decision does not match the completed review job.");
       if (overrides.has(value.id)) throw new Error("AI decisions cannot contain duplicate files.");
       overrides.set(value.id, value.destination);
     }

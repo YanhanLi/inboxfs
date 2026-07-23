@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import request from "supertest";
@@ -53,6 +53,7 @@ describe("local AI safety boundary", () => {
     const settingsPath = path.join(root, "state", "ai.json");
     const saved = await writeAiSettings({ enabled: true, model: "model:1b", includeText: true, destinations: ["Projects", "Archive"] }, settingsPath);
     expect(await readAiSettings(settingsPath)).toEqual(saved);
+    expect((await stat(settingsPath)).mode & 0o777).toBe(0o600);
     const target = path.join(root, "target.json");
     await writeFile(target, "unchanged");
     await rm(settingsPath);
@@ -91,6 +92,7 @@ describe("local AI safety boundary", () => {
     await cache.set(firstKey, { destination: "Projects", confidence: 0.9, explanation: "Project material" });
     expect(await cache.get(firstKey)).toEqual({ destination: "Projects", confidence: 0.9, explanation: "Project material" });
     const stored = await readFile(cachePath, "utf8");
+    expect((await stat(cachePath)).mode & 0o777).toBe(0o600);
     expect(stored).not.toContain("private file contents");
     expect(stored).not.toContain(root);
   });
@@ -142,6 +144,15 @@ describe("local AI safety boundary", () => {
     const invalidStarted = await invalid.start(scan, { enabled: true, model: "local-model:1b", includeText: false, destinations: ["Projects", "Archive"] });
     await vi.waitFor(() => expect(invalid.get(invalidStarted.id).status).toBe("completed"));
     expect(invalid.get(invalidStarted.id).results[0]).toMatchObject({ status: "failed", error: expect.stringContaining("outside the allowed list") });
+    expect(() => invalid.validateDecisions(invalidStarted.id, [{ id: invalid.get(invalidStarted.id).results[0].suggestionId, destination: "Projects" }])).toThrow("does not match");
+  });
+
+  it("reports a local model service outage without failing the workspace status request", async () => {
+    const root = await fixture();
+    const unavailable: AiProvider = { listModels: async () => { throw new Error("connect ECONNREFUSED 127.0.0.1:11434"); }, classify: async () => ({}) };
+    const app = createApp(root, undefined, { aiProvider: unavailable, aiSettingsPath: path.join(root, "state", "ai.json") });
+    const response = await request(app).get("/api/ai/status").expect(200);
+    expect(response.body).toMatchObject({ available: false, models: [], error: expect.stringContaining("ECONNREFUSED") });
   });
 
   it("cancels an active review without producing an accepted result", async () => {

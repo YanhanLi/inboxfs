@@ -147,6 +147,20 @@ test.describe.serial("InboxFS workspace", () => {
     await expect(aiDialog.getByText("Review suggestions", { exact: true })).toBeVisible();
     await expect(aiDialog.getByText("Metadata only · cached", { exact: true })).toBeVisible();
     await aiDialog.getByRole("button", { name: "Add to plan", exact: true }).click();
+
+    await page.getByRole("button", { name: "Local AI 1", exact: true }).click();
+    const ruleDialogSource = page.getByRole("dialog", { name: "Review unmatched files", exact: true });
+    await ruleDialogSource.getByRole("button", { name: "Analyze", exact: true }).click();
+    await expect(ruleDialogSource.getByText("Metadata only · cached", { exact: true })).toBeVisible();
+    await ruleDialogSource.getByRole("button", { name: "Create rule", exact: true }).click();
+    const rulesDialog = page.getByRole("dialog", { name: "Custom rules", exact: true });
+    const seededRule = rulesDialog.getByRole("group", { name: "Priority 3", exact: true });
+    await expect(seededRule.getByLabel("Name", { exact: true })).toHaveValue("project-plan.unknown files");
+    await expect(seededRule.getByLabel("File name globs", { exact: true })).toHaveValue("project-plan.unknown");
+    await expect(seededRule.getByLabel("Destination", { exact: true })).toHaveValue("Projects");
+    page.once("dialog", (confirmation) => confirmation.accept());
+    await rulesDialog.getByRole("button", { name: "Close custom rules", exact: true }).click();
+
     await page.getByRole("button", { name: "Inspect project-plan.unknown", exact: true }).click();
     let details = page.getByRole("dialog", { name: "Details", exact: true });
     await expect(details).toContainText("Local AI");
@@ -199,5 +213,8 @@ test.describe.serial("InboxFS workspace", () => {
     await page.getByRole("button", { name: "Local AI 1", exact: true }).click();
     await expect(page.getByRole("alert")).toContainText("Panel unavailable");
     await page.unroute(/AiDialog-.*\.js$/);
+    await page.getByRole("button", { name: "Reload workspace", exact: true }).click();
+    await page.getByRole("button", { name: "Local AI 1", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Review unmatched files", exact: true })).toBeVisible();
   });
 });
