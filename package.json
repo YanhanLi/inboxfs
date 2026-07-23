@@ -21,9 +21,11 @@
     "test": "vitest run --config vitest.config.ts",
     "test:e2e": "playwright test",
     "benchmark:rules": "node scripts/benchmark-rules.mjs",
+    "benchmark:ai": "node scripts/benchmark-ai.mjs",
+    "evaluate:ai": "node scripts/evaluate-ai.mjs",
     "screenshots": "node scripts/capture-screenshots.mjs",
     "check:bundle": "node scripts/check-bundle-budget.mjs",
-    "check": "npm run build && npm test && npm run benchmark:rules && npm run check:bundle && npm run test:e2e",
+    "check": "npm run build && npm test && npm run benchmark:rules && npm run benchmark:ai && npm run check:bundle && npm run test:e2e",
     "prepare": "npm run build"
   },
   "engines": {
