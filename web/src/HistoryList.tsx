@@ -1,6 +1,5 @@
 import { History, Undo2 } from "lucide-react";
-
-interface MoveRecord { id: string; createdAt: string; sourcePath: string; destinationPath: string; undoneAt?: string }
+import type { MoveRecord } from "./types";
 interface HistoryListProps { records: MoveRecord[]; busy: boolean; onUndo: (id: string) => void }
 
 const basename = (value: string) => value.split(/[\\/]/).pop() ?? value;

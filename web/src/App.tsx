@@ -7,7 +7,6 @@ import {
   ClipboardCheck,
   Copy,
   File,
-  Files,
   FolderClosed,
   FolderInput,
   HardDrive,
@@ -23,20 +22,20 @@ import {
 } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { json } from "./api";
+import type { MoveRecord, Scan, Suggestion } from "./types";
 
-const RulesDialog = lazy(() => import("./RulesDialog"));
-const Inspector = lazy(() => import("./Inspector"));
-const HistoryList = lazy(() => import("./HistoryList"));
+const RulesDialog = lazy(() => import("./RulesDialog").catch(() => import("./LoadError")));
+const Inspector = lazy(() => import("./Inspector").catch(() => import("./LoadError")));
+const HistoryList = lazy(() => import("./HistoryList").catch(() => import("./LoadError")));
+const Summary = lazy(() => import("./Summary").catch(() => import("./LoadError")));
 
-interface Suggestion { id: string; name: string; extension: string; category: string; size: number; modifiedAt: string; sourcePath: string; destinationPath: string; classification: { type: "custom" | "extension" | "fallback"; pattern: string; explanation: string; ruleName?: string; source?: string }; selected: boolean; duplicateOf?: string; duplicateHash?: string }
-interface Scan { root: string; scannedAt: string; suggestions: Suggestion[]; categoryCounts: Record<string, number>; totalSize: number; ruleConfig: { customRuleCount: number; source?: string } }
-interface Record { id: string; createdAt: string; sourcePath: string; destinationPath: string; undoneAt?: string }
 type Theme = "light" | "dark";
 type SortOption = "name-asc" | "modified-desc" | "size-desc" | "destination-asc";
 
 const formatSize = (bytes: number) => bytes < 1024 ? `${bytes} B` : bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`;
 const basename = (value: string) => value.split(/[\\/]/).pop() ?? value;
 const parentFolder = (value: string) => basename(value.split(/[\\/]/).slice(0, -1).join("/"));
+const asyncFallback = <div className="async-loading" role="status"><span>Loading</span></div>;
 
 function initialTheme(): Theme {
   try {
@@ -48,7 +47,7 @@ function initialTheme(): Theme {
 
 export function App() {
   const [scan, setScan] = useState<Scan>();
-  const [history, setHistory] = useState<Record[]>([]);
+  const [history, setHistory] = useState<MoveRecord[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All files");
@@ -60,6 +59,7 @@ export function App() {
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const [rulesOpen, setRulesOpen] = useState(false);
   const selectionOverrides = useRef<Map<string, boolean>>(new Map());
+  const refreshSequence = useRef(0);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -71,9 +71,11 @@ export function App() {
   }, [scan, inspectedId]);
 
   const refresh = useCallback(async (preserveSelection = false) => {
+    const sequence = ++refreshSequence.current;
     setBusy(true);
     try {
-      const [nextScan, nextHistory] = await Promise.all([json<Scan>("/api/scan"), json<Record[]>("/api/history")]);
+      const [nextScan, nextHistory] = await Promise.all([json<Scan>("/api/scan"), json<MoveRecord[]>("/api/history")]);
+      if (sequence !== refreshSequence.current) return;
       setScan(nextScan); setHistory(nextHistory);
       setScanError("");
       if (!preserveSelection) selectionOverrides.current.clear();
@@ -84,8 +86,11 @@ export function App() {
       setSelected(new Set(nextScan.suggestions
         .filter((item) => selectionOverrides.current.get(item.id) ?? item.selected)
         .map((item) => item.id)));
-    } catch (error) { setScanError(error instanceof Error ? error.message : "Unable to scan folder"); }
-    finally { setBusy(false); }
+    } catch (error) {
+      if (sequence === refreshSequence.current) setScanError(error instanceof Error ? error.message : "Unable to scan folder");
+    } finally {
+      if (sequence === refreshSequence.current) setBusy(false);
+    }
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
   useEffect(() => {
@@ -133,10 +138,6 @@ export function App() {
     });
   }
 
-  function toggleTheme() {
-    setTheme((current) => current === "light" ? "dark" : "light");
-  }
-
   function openRules() {
     setInspectedId(undefined);
     setRulesOpen(true);
@@ -152,7 +153,7 @@ export function App() {
     if (!selected.size) return;
     setBusy(true); setNotice("");
     try {
-      const result = await json<{ moved: Record[] }>("/api/organize", { method: "POST", body: JSON.stringify({ ids: [...selected] }) });
+      const result = await json<{ moved: MoveRecord[] }>("/api/organize", { method: "POST", body: JSON.stringify({ ids: [...selected] }) });
       setNotice(`${result.moved.length} file${result.moved.length === 1 ? "" : "s"} organized.`);
       await refresh();
     } catch (error) { setNotice(error instanceof Error ? error.message : "Unable to organize files"); setBusy(false); }
@@ -188,16 +189,14 @@ export function App() {
           <span className="status-dot" aria-hidden="true" />
           <div><strong>{busy ? "Scanning" : "Watching"}</strong><small>{scan ? `Updated ${new Date(scan.scannedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Connecting"}</small></div>
           <button className="icon-button mobile-rules-button" aria-label="Edit classification rules" title="Edit rules" onClick={openRules}><SlidersHorizontal size={18} /></button>
-          <button className="icon-button" aria-label={`Use ${theme === "light" ? "dark" : "light"} theme`} title={`Use ${theme === "light" ? "dark" : "light"} theme`} onClick={toggleTheme}>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</button>
+          <button className="icon-button" aria-label={`Use ${theme === "light" ? "dark" : "light"} theme`} title="Change theme" onClick={() => setTheme(theme === "light" ? "dark" : "light")}>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</button>
           <button className="icon-button" aria-label="Scan folder again" title="Scan again" onClick={() => { setNotice(""); void refresh(); }} disabled={busy}><RefreshCw size={18} className={busy ? "spin" : ""} /></button>
         </div>
       </header>
 
-      <section className="summary" aria-label="Inbox summary">
-        <div><span className="metric-icon metric-ready"><Files size={18} aria-hidden="true" /></span><span><small>Ready</small><strong>{scan?.suggestions.length ?? 0}<em> files</em></strong></span></div>
-        <div><span className="metric-icon metric-size"><HardDrive size={18} aria-hidden="true" /></span><span><small>Selected</small><strong>{formatSize(selectedSize)}</strong></span></div>
-        <div><span className={`metric-icon metric-duplicate${duplicateCount ? "" : " is-empty"}`}><Copy size={18} aria-hidden="true" /></span><span><small>Held back</small><strong>{duplicateCount}<em> duplicates</em></strong></span></div>
-      </section>
+      <Suspense fallback={<div className="summary summary-loading" role="status" aria-label="Loading inbox summary" />}>
+        {scan ? <Summary files={scan.suggestions.length} selectedSize={selectedSize} duplicates={duplicateCount} /> : <div className="summary summary-loading" role="status" aria-label="Loading inbox summary" />}
+      </Suspense>
 
       <section className="workspace" id="files" aria-labelledby="files-heading">
         <div className="section-heading">
@@ -224,7 +223,7 @@ export function App() {
             <label className="checkbox-cell"><input aria-label="Select all visible files" type="checkbox" checked={allFilteredSelected} onChange={(event) => setFilteredSelected(event.target.checked)} /></label>
             <span>File</span><span>Destination</span><span>Size</span><span className="sr-only">Inspect</span>
           </div>
-          {!scan && !scanError && Array.from({ length: 5 }, (_, index) => <div className="row skeleton-row" key={index} aria-hidden="true"><span /><span /><span /><span /></div>)}
+          {!scan && !scanError && [0, 1, 2, 3, 4].map((index) => <div className="row skeleton-row" key={index} aria-hidden="true"><span /><span /><span /><span /></div>)}
           {visible.map((item) => <div className={`row${selected.has(item.id) ? " selected" : ""}${inspectedId === item.id ? " inspected" : ""}`} key={item.id}>
             <label className="checkbox-cell"><input aria-label={`Select ${item.name}`} type="checkbox" checked={selected.has(item.id)} onChange={(event) => setItemSelected(item.id, event.target.checked)} /></label>
             <div className="filename"><span className="file-icon"><File size={18} aria-hidden="true" /></span><span><strong title={item.name}>{item.name}</strong><small><Clock3 size={12} aria-hidden="true" />{new Date(item.modifiedAt).toLocaleDateString()}</small></span></div>
@@ -243,14 +242,14 @@ export function App() {
       <section className="activity" id="activity" aria-labelledby="activity-heading">
         <div className="section-heading"><div><h2 id="activity-heading">Recent activity</h2><p>{history.length} moves recorded</p></div></div>
         <div className="history-list">
-          {history.length > 0 && <Suspense fallback={null}><HistoryList records={history} busy={busy} onUndo={undo} /></Suspense>}
+          {history.length > 0 && <Suspense fallback={asyncFallback}><HistoryList records={history} busy={busy} onUndo={undo} /></Suspense>}
           {!history.length && <div className="activity-empty"><History size={18} aria-hidden="true" /><span>Organized files will appear here.</span></div>}
         </div>
       </section>
     </main>
 
-    {inspected && <Suspense fallback={null}><Inspector item={inspected} included={selected.has(inspected.id)} onClose={() => setInspectedId(undefined)} onSelected={(value) => setItemSelected(inspected.id, value)} /></Suspense>}
+    {inspected && <Suspense fallback={asyncFallback}><Inspector item={inspected} included={selected.has(inspected.id)} onClose={() => setInspectedId(undefined)} onSelected={(value) => setItemSelected(inspected.id, value)} /></Suspense>}
 
-    {rulesOpen && <Suspense fallback={null}><RulesDialog onClose={() => setRulesOpen(false)} onSaved={rulesSaved} /></Suspense>}
+    {rulesOpen && <Suspense fallback={asyncFallback}><RulesDialog onClose={() => setRulesOpen(false)} onSaved={rulesSaved} /></Suspense>}
   </div>;
 }

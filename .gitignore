@@ -4,3 +4,5 @@ web-dist/
 .DS_Store
 coverage/
 *.log
+playwright-report/
+test-results/

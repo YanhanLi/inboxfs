@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.0
+
+- Split rules, file details, activity history, and inbox summary into independently maintained, lazy-loaded interface modules.
+- Add explicit loading, failure, retry, and workspace-reload states for configuration requests and asynchronous interface chunks.
+- Prevent stale filesystem-event refreshes from overwriting newer organization and undo results.
+- Canonicalize the inbox root once at the HTTP boundary so scans, mutations, and history use the same ledger through symbolic-link aliases.
+- Add Chromium end-to-end coverage for desktop and mobile layouts, theme persistence, rule validation, file details, organization, history, undo, and chunk recovery.
+- Establish automated WCAG 2 AA checks, a 67.12 kB gzip budget for the main JavaScript bundle, and a GitHub Actions quality workflow.
+- Expand the safety suite with a symbolic-link inbox identity regression and keep dependency auditing free of known vulnerabilities.
+
 ## 0.7.0
 
 - Add a responsive custom-rule editor for creating, updating, and deleting extension rules without hand-editing JSON.

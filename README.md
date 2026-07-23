@@ -42,7 +42,7 @@ npx github:YanhanLi/inboxfs ~/Desktop
 - rejects symbolic-link paths that would leave the selected inbox;
 - works in desktop and mobile-width browsers without a cloud account;
 - provides keyboard-friendly filters, search, bulk selection, and responsive file views;
-- follows the system light or dark theme and remembers manual theme changes locally.
+- follows the system light or dark theme and remembers manual theme changes locally;
 - creates, edits, validates, and removes custom extension rules from the responsive workspace.
 
 ## Custom rules
@@ -85,15 +85,16 @@ Undo history is stored as a private JSON file under `~/.inboxfs/`. Version 0.2 a
 git clone https://github.com/YanhanLi/inboxfs.git
 cd inboxfs
 npm install
+npx playwright install chromium
 npm run check
 npm run dev -- /path/to/a/test-folder --no-open
 ```
 
-`npm run check` builds the Node server and React interface, then runs the filesystem safety tests.
+`npm run check` builds the Node server and React interface, runs the filesystem and HTTP safety tests, enforces the 67.12 kB gzip budget for the main JavaScript bundle, and exercises the critical desktop and mobile workflows in Chromium. The browser suite also checks WCAG 2 AA accessibility rules and lazy-chunk recovery.
 
 ## Safety model
 
-InboxFS binds to the loopback interface and exposes no cloud service. The server rejects non-loopback Host headers and cross-origin mutations. Mutations are serialized, accept IDs from a fresh scan, and re-scan before moving, which prevents concurrent writes and stale previews from silently applying. Destinations are canonicalized before use; symlink escapes, changed undo targets, and occupied restore paths are rejected.
+InboxFS binds to the loopback interface and exposes no cloud service. The server rejects non-loopback Host headers and cross-origin mutations. Mutations are serialized, accept IDs from a fresh scan, and re-scan before moving, which prevents concurrent writes and stale previews from silently applying. The inbox root and destinations are canonicalized before use so history, scans, and mutations share one directory identity; symlink escapes, changed undo targets, and occupied restore paths are rejected.
 
 Duplicate detection first groups candidates by file size and only hashes same-size files, avoiding unnecessary reads for unique sizes. A duplicate is held back rather than deleted; the user remains in control.
 

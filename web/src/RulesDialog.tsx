@@ -10,21 +10,43 @@ interface RulesDialogProps { onClose: () => void; onSaved: (count: number) => Pr
 let ruleSequence = 0;
 const draftRule = (rule?: RuleDocument): RuleDraft => ({ id: `rule-${Date.now()}-${ruleSequence++}`, name: rule?.name ?? "", destination: rule?.destination ?? "", extensions: rule?.extensions.join(", ") ?? "" });
 
+class ConfigReadError extends Error {
+  constructor(message: string, readonly replaceAllowed: boolean) { super(message); }
+}
+
+async function readConfig(): Promise<ConfigDocument> {
+  const response = await fetch("/api/config", { headers: { "Content-Type": "application/json" } });
+  const body = await response.json();
+  if (!response.ok) throw new ConfigReadError(body.error ?? "Unable to open custom rules", response.status === 409);
+  return body as ConfigDocument;
+}
+
 export default function RulesDialog({ onClose, onSaved }: RulesDialogProps) {
   const [drafts, setDrafts] = useState<RuleDraft[]>([]);
   const [busy, setBusy] = useState(true);
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState("");
+  const [replaceAllowed, setReplaceAllowed] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
     dialogRef.current?.showModal();
-    void json<ConfigDocument>("/api/config").then((config) => {
-      setDrafts(config.rules.map((rule) => draftRule(rule)));
-    }).catch((reason) => {
-      setError(reason instanceof Error ? reason.message : "Unable to open custom rules");
-    }).finally(() => setBusy(false));
+    void load();
   }, []);
+
+  async function load() {
+    setBusy(true);
+    setError("");
+    setReplaceAllowed(false);
+    try {
+      const config = await readConfig();
+      setDrafts(config.rules.map((rule) => draftRule(rule)));
+      setDirty(false);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to open custom rules");
+      setReplaceAllowed(reason instanceof ConfigReadError && reason.replaceAllowed);
+    } finally { setBusy(false); }
+  }
 
   function close() {
     if (dirty && !window.confirm("Discard unsaved rule changes?")) return;
@@ -60,7 +82,7 @@ export default function RulesDialog({ onClose, onSaved }: RulesDialogProps) {
       <header className="rules-header"><div><span>Classification</span><h2 id="rules-title">Custom rules</h2></div><button type="button" className="icon-button" aria-label="Close custom rules" title="Close" onClick={close}><X size={18} /></button></header>
       <div className="rules-body" aria-busy={busy}>
         {busy && !drafts.length && !error && <div className="rules-loading"><RefreshCw className="spin" size={19} aria-hidden="true" /><span>Loading rules</span></div>}
-        {error && <div className="rules-error" role="alert"><AlertTriangle size={16} aria-hidden="true" /><span>{error}</span>{!drafts.length && <button type="button" onClick={replaceBrokenConfig}>Replace configuration</button>}</div>}
+        {error && <div className="rules-error" role="alert"><AlertTriangle size={16} aria-hidden="true" /><span>{error}</span>{!drafts.length && <span className="rules-error-actions"><button type="button" onClick={() => void load()}>Try again</button>{replaceAllowed && <button type="button" onClick={replaceBrokenConfig}>Replace configuration</button>}</span>}</div>}
         {!busy && !drafts.length && !error && <div className="rules-empty"><SlidersHorizontal size={24} aria-hidden="true" /><strong>No custom rules</strong><button type="button" onClick={() => { setDrafts([draftRule()]); setDirty(true); }}>Add rule</button></div>}
         {drafts.map((rule, index) => <fieldset className="rule-editor" key={rule.id} disabled={busy}>
           <legend>Rule {index + 1}</legend>

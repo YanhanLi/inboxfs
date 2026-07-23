@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import request from "supertest";
@@ -21,6 +21,19 @@ describe("local HTTP boundary", () => {
     const response = await request(app).get("/api/scan").expect(200);
     expect(response.body.suggestions).toHaveLength(1);
     expect(response.body.suggestions[0].classification.pattern).toBe("*.txt");
+  });
+
+  it("uses one ledger identity when the inbox is opened through a symbolic link", async () => {
+    const { root } = await fixture();
+    const alias = `${root}-alias`;
+    roots.push(alias);
+    await symlink(root, alias, "dir");
+    const app = createApp(alias);
+    const scan = await request(app).get("/api/scan").expect(200);
+    await request(app).post("/api/organize").send({ ids: [scan.body.suggestions[0].id] }).expect(200);
+    const history = await request(app).get("/api/history").expect(200);
+    expect(history.body).toHaveLength(1);
+    expect(history.body[0].sourcePath).toBe(path.join(await realpath(root), "notes.txt"));
   });
 
   it("returns a clear conflict response for invalid local rules", async () => {

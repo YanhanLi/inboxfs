@@ -1,18 +1,6 @@
 import { Clock3, Copy, File, FileSearch, FolderClosed, Hash, MapPin, X } from "lucide-react";
 import { useEffect, useRef } from "react";
-
-interface Suggestion {
-  id: string;
-  name: string;
-  category: string;
-  size: number;
-  modifiedAt: string;
-  sourcePath: string;
-  destinationPath: string;
-  classification: { type: "custom" | "extension" | "fallback"; pattern: string; explanation: string; ruleName?: string; source?: string };
-  duplicateOf?: string;
-  duplicateHash?: string;
-}
+import type { Suggestion } from "./types";
 
 interface InspectorProps {
   item: Suggestion;

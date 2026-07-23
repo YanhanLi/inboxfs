@@ -1,5 +1,5 @@
 import express from "express";
-import { watch } from "node:fs";
+import { realpathSync, watch } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readLedger, resolveLedgerPath } from "./ledger.js";
@@ -9,6 +9,7 @@ import { MutationLock } from "./mutation-lock.js";
 import { configDocument, readInboxConfig, writeInboxConfig } from "./config.js";
 
 export function createApp(root: string, webRoot?: string) {
+  root = realpathSync(root);
   const app = express();
   const mutationLock = new MutationLock();
   app.use(express.json({ limit: "64kb" }));
