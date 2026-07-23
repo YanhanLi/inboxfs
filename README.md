@@ -43,39 +43,54 @@ npx github:YanhanLi/inboxfs ~/Desktop
 - works in desktop and mobile-width browsers without a cloud account;
 - provides keyboard-friendly filters, search, bulk selection, and responsive file views;
 - follows the system light or dark theme and remembers manual theme changes locally;
-- creates, edits, validates, and removes custom extension rules from the responsive workspace.
+- creates, orders, previews, enables, disables, validates, and removes deterministic multi-condition rules from the responsive workspace.
 
 ## Custom rules
 
-Choose **Rules** in the workspace to create and edit custom extension categories. InboxFS validates the complete rule set before atomically saving `.inboxfs.json` in the folder being scanned.
+Choose **Rules** in the workspace to create and edit custom categories. The editor previews match counts, sample files, destination changes, and priority conflicts before anything is saved. Previewing is read-only: it does not move files or rewrite `.inboxfs.json`.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/inboxfs-rules-dark.png">
+  <img alt="InboxFS deterministic rule editor with a read-only impact preview" src="docs/inboxfs-rules.png">
+</picture>
+
+InboxFS validates the complete rule set before atomically saving `.inboxfs.json` in the folder being scanned. The same versioned file can also be edited directly:
 
 The same versioned file can also be edited directly:
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "rules": [
     {
-      "name": "Research papers",
-      "extensions": ["pdf", "epub"],
-      "destination": "Research"
+      "name": "Large reports",
+      "destination": "Reports",
+      "enabled": true,
+      "match": {
+        "extensions": ["pdf"],
+        "nameGlobs": ["report-*.pdf"],
+        "size": { "minBytes": 1000000 }
+      }
     },
     {
-      "name": "Course data",
-      "extensions": ["csv", "xlsx"],
-      "destination": "Coursework"
+      "name": "Reading",
+      "destination": "Books",
+      "enabled": true,
+      "match": { "extensions": ["epub", "mobi"] }
     }
   ]
 }
 ```
 
-Custom rules take precedence over built-in categories. Extensions are case-insensitive and may include a leading dot. Each extension can belong to only one custom rule, and destinations must be single visible folder names without path separators. InboxFS rejects invalid, ambiguous, oversized, or symbolic-link configurations.
+Rules are evaluated from top to bottom and the first enabled match wins. Conditions inside one rule are combined with AND; values inside `extensions` or `nameGlobs` are combined with OR. Extensions and bounded `*`/`?` file-name globs are case-insensitive. Globs never match path separators, and arbitrary regular expressions, recursive `**` patterns, and scripts are rejected. Destinations must be single visible folder names without path separators.
+
+Version 1 extension-only files remain supported. The editor reads them without losing rules and writes normalized version 2 only after an explicit save. See [the v1 to v2 migration guide](docs/rules-v2.md) for the complete schema and compatibility behavior.
 
 The workspace watches `.inboxfs.json` for changes. Saving a destination immediately refreshes the preview and invalidates the previous suggestion IDs, so a stale organization plan cannot silently move files using a new rule.
 
 ## What it does not do yet
 
-InboxFS uses deterministic file-extension rules. It does not inspect document contents, run OCR, or use an AI model. Those features will only be added when they preserve the preview-first and local-first behavior.
+InboxFS uses deterministic file metadata rules. It does not inspect document contents, run OCR, upload content, execute scripts, or use an AI model. Those features will only be added when they preserve the preview-first and local-first behavior.
 
 Undo history is stored as a private JSON file under `~/.inboxfs/`. Version 0.2 automatically migrates matching v0.1 history to collision-resistant per-directory ledgers. InboxFS is an organizer, not a backup system.
 
@@ -90,7 +105,7 @@ npm run check
 npm run dev -- /path/to/a/test-folder --no-open
 ```
 
-`npm run check` builds the Node server and React interface, runs the filesystem and HTTP safety tests, enforces the 67.12 kB gzip budget for the main JavaScript bundle, and exercises the critical desktop and mobile workflows in Chromium. The browser suite also checks WCAG 2 AA accessibility rules and lazy-chunk recovery.
+`npm run check` builds the Node server and React interface, runs the filesystem and HTTP safety tests, benchmarks 100 rules against 10,000 file records, enforces the 67.12 kB gzip budget for the main JavaScript bundle, and exercises the critical desktop and mobile workflows in Chromium. The browser suite also checks WCAG 2 AA accessibility rules and lazy-chunk recovery.
 
 ## Safety model
 

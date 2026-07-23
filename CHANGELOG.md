@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.0
+
+- Introduce a backward-compatible `.inboxfs.json` v2 schema with ordered, enabled or disabled rules combining extensions, bounded file-name globs, and byte-size ranges.
+- Preserve version 1 extension rules in memory and normalize them to version 2 only when explicitly saved.
+- Add read-only impact previews with match counts, sample files, destination changes, and shadow or overlap diagnostics.
+- Make every normalized rule edit invalidate stale organization suggestions, including priority, condition, enabled-state, and rule-name changes.
+- Reject arbitrary regular expressions, scripts, recursive globs, path separators, unsafe destinations, oversized configurations, and symbolic-link configuration writes.
+- Add a repeatable 100-rule by 10,000-file benchmark with a 100 ms p95 budget while retaining the 67.12 kB main JavaScript gzip ceiling.
+- Expand unit, HTTP, desktop, mobile, dark-theme, accessibility, migration, preview-purity, and invalid-draft coverage.
+
 ## 0.8.1
 
 - Move recent activity and file rows into dedicated lazy modules, giving the main JavaScript budget reliable headroom across zlib implementations used by macOS and Linux CI.

@@ -250,7 +250,7 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--primary)
 .plan-control input { width: 18px; height: 18px; }
 .rules-dialog { width: min(680px, 100vw); max-width: none; height: 100dvh; max-height: none; margin: 0 0 0 auto; padding: 0; border: 0; border-left: 1px solid var(--border); background: var(--surface); color: var(--text); box-shadow: -12px 0 32px #0003; }
 .rules-dialog::backdrop { background: #0c0d0e99; }
-.rules-panel { min-height: 100%; display: grid; grid-template-rows: auto 1fr auto; background: var(--surface); }
+.rules-panel { height: 100%; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: var(--surface); }
 .rules-header { min-height: 76px; padding: 14px 18px 14px 22px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .rules-header > div { display: grid; gap: 3px; }
 .rules-header span { color: var(--green); font-size: 10px; font-weight: 750; text-transform: uppercase; }
