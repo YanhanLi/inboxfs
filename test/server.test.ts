@@ -45,17 +45,29 @@ describe("local HTTP boundary", () => {
 
   it("reads and atomically saves normalized custom rules", async () => {
     const { root, app } = await fixture();
-    await request(app).get("/api/config").expect(200, { version: 1, rules: [] });
+    await request(app).get("/api/config").expect(200, { version: 2, rules: [] });
 
     const response = await request(app).put("/api/config").send({
       version: 1,
       rules: [{ name: "Reading", destination: "Reading", extensions: [".TXT", "pdf"] }],
     }).expect(200);
 
-    expect(response.body.rules[0].extensions).toEqual(["txt", "pdf"]);
+    expect(response.body).toEqual({ version: 2, rules: [{ name: "Reading", destination: "Reading", enabled: true, match: { extensions: ["txt", "pdf"] } }] });
     expect(JSON.parse(await readFile(path.join(root, ".inboxfs.json"), "utf8"))).toEqual(response.body);
     const scan = await request(app).get("/api/scan").expect(200);
     expect(scan.body.suggestions[0].category).toBe("Reading");
+  });
+
+  it("previews v2 rules without creating or changing the configuration file", async () => {
+    const { root, app } = await fixture();
+    const response = await request(app).post("/api/config/preview").send({
+      version: 2,
+      rules: [{ name: "Text notes", destination: "Notes", enabled: true, match: { nameGlobs: ["notes.*"], size: { maxBytes: 10 } } }],
+    }).expect(200);
+    expect(response.body.summary).toEqual({ totalFiles: 1, matchedFiles: 1, changedFiles: 1, unmatchedFiles: 0 });
+    expect(response.body.rules[0]).toMatchObject({ name: "Text notes", matchCount: 1, samples: ["notes.txt"] });
+    await expect(readFile(path.join(root, ".inboxfs.json"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+    expect(await readFile(path.join(root, "notes.txt"), "utf8")).toBe("hello");
   });
 
   it("rejects unsafe rule writes", async () => {
@@ -84,6 +96,7 @@ describe("local HTTP boundary", () => {
   it("rejects cross-origin mutations", async () => {
     const { app } = await fixture();
     await request(app).post("/api/organize").set("Origin", "https://malicious.example").send({ ids: [] }).expect(403);
+    await request(app).post("/api/config/preview").set("Origin", "https://malicious.example").send({ version: 2, rules: [] }).expect(403);
     await request(app).put("/api/config").set("Origin", "https://malicious.example").send({ version: 1, rules: [] }).expect(403);
   });
 });

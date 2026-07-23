@@ -1,6 +1,7 @@
 import path from "node:path";
 import type { CustomRule } from "./config.js";
 import type { Category, ClassificationMatch } from "./model.js";
+import { ruleMatches, rulePattern } from "./rules.js";
 
 const GROUPS: Array<[Category, Set<string>]> = [
   ["Documents", new Set(["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "md", "rtf", "epub"])],
@@ -21,16 +22,16 @@ export function classify(filename: string): Category {
   return explainClassification(filename).category as Category;
 }
 
-export function explainClassification(filename: string, customRules: CustomRule[] = []): { category: string; classification: ClassificationMatch } {
+export function explainClassification(filename: string, customRules: CustomRule[] = [], size = 0): { category: string; classification: ClassificationMatch } {
   const extension = extensionOf(filename);
-  const custom = customRules.find((rule) => rule.extensions.has(extension));
+  const custom = customRules.find((rule) => ruleMatches(rule, { name: filename, extension, size }));
   if (custom) {
     return {
       category: custom.destination,
       classification: {
         type: "custom",
-        pattern: `*.${extension}`,
-        explanation: `Custom rule “${custom.name}” maps .${extension} files to ${custom.destination}.`,
+        pattern: rulePattern(custom),
+        explanation: `Custom rule “${custom.name}” is the first enabled rule whose conditions match this file, routing it to ${custom.destination}.`,
         ruleName: custom.name,
         source: ".inboxfs.json"
       }

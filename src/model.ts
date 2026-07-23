@@ -49,7 +49,9 @@ export interface ScanResult {
   categoryCounts: Record<string, number>;
   totalSize: number;
   ruleConfig: {
+    version: 2;
     customRuleCount: number;
     source?: string;
+    migratedFromVersion?: 1;
   };
 }

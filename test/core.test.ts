@@ -6,6 +6,9 @@ import { rm } from "node:fs/promises";
 import { organizeFiles, undoMove } from "../src/organizer.js";
 import { scanInbox } from "../src/scanner.js";
 import { defaultLedgerPath, recordsForRoot } from "../src/ledger.js";
+import { configDocument, parseInboxConfig } from "../src/config.js";
+import { previewInboxConfig } from "../src/preview.js";
+import { matchesGlob } from "../src/rules.js";
 
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
@@ -44,17 +47,97 @@ describe("InboxFS core", () => {
     await writeFile(path.join(root, ".inboxfs.json"), JSON.stringify({ version: 1, rules: [{ name: "Research papers", extensions: [".pdf", "epub"], destination: "Research" }] }));
     await writeFile(path.join(root, "paper.pdf"), "paper");
     const scan = await scanInbox(root);
-    expect(scan.ruleConfig).toEqual({ customRuleCount: 1, source: ".inboxfs.json" });
+    expect(scan.ruleConfig).toEqual({ version: 2, customRuleCount: 1, source: ".inboxfs.json", migratedFromVersion: 1 });
     expect(scan.suggestions[0]).toMatchObject({
       category: "Research",
       classification: {
         type: "custom",
-        pattern: "*.pdf",
+        pattern: "*.pdf, *.epub",
         ruleName: "Research papers",
         source: ".inboxfs.json"
       }
     });
     expect(scan.suggestions[0].destinationPath.endsWith(path.join("Research", "paper.pdf"))).toBe(true);
+  });
+
+  it("migrates v1 rules to normalized v2 documents without losing extensions", () => {
+    const config = parseInboxConfig({ version: 1, rules: [{ name: "Reading", destination: "Books", extensions: [".EPUB", "mobi"] }] }, ".inboxfs.json");
+    expect(config.migratedFromVersion).toBe(1);
+    expect(configDocument(config)).toEqual({
+      version: 2,
+      rules: [{ name: "Reading", destination: "Books", enabled: true, match: { extensions: ["epub", "mobi"] } }],
+    });
+  });
+
+  it("rejects executable or unknown fields in legacy configurations", () => {
+    expect(() => parseInboxConfig({ version: 1, script: "return true", rules: [] })).toThrow('unsupported field "script"');
+    expect(() => parseInboxConfig({
+      version: 1,
+      rules: [{ name: "Legacy regex", destination: "Unsafe", extensions: ["txt"], regex: ".*" }],
+    })).toThrow('unsupported field "regex"');
+  });
+
+  it("applies enabled multi-condition rules in explicit array priority", async () => {
+    const root = await inbox();
+    await writeFile(path.join(root, ".inboxfs.json"), JSON.stringify({
+      version: 2,
+      rules: [
+        { name: "Disabled", destination: "Disabled", enabled: false, match: { extensions: ["pdf"] } },
+        { name: "Large invoices", destination: "Finance", enabled: true, match: { extensions: ["pdf"], nameGlobs: ["invoice-*.pdf"], size: { minBytes: 10 } } },
+        { name: "Remaining PDFs", destination: "Papers", enabled: true, match: { extensions: ["pdf"] } },
+      ],
+    }));
+    await Promise.all([
+      writeFile(path.join(root, "invoice-large.pdf"), "a sufficiently large invoice"),
+      writeFile(path.join(root, "invoice-small.pdf"), "tiny"),
+      writeFile(path.join(root, "paper.pdf"), "paper"),
+    ]);
+    const scan = await scanInbox(root);
+    expect(scan.suggestions.map((item) => [item.name, item.category, item.classification.ruleName])).toEqual([
+      ["invoice-large.pdf", "Finance", "Large invoices"],
+      ["invoice-small.pdf", "Papers", "Remaining PDFs"],
+      ["paper.pdf", "Papers", "Remaining PDFs"],
+    ]);
+  });
+
+  it("matches bounded file-name globs without path or regular-expression semantics", () => {
+    expect(matchesGlob("Invoice-2026.PDF", "invoice-????.pdf")).toBe(true);
+    expect(matchesGlob("invoice-final.pdf", "invoice-*.pdf")).toBe(true);
+    expect(matchesGlob("报告.pdf", "??.pdf")).toBe(true);
+    expect(matchesGlob("file[1].pdf", "file[1].pdf")).toBe(true);
+    expect(matchesGlob("nested/invoice.pdf", "*.pdf")).toBe(false);
+    expect(() => parseInboxConfig({ version: 2, rules: [{ name: "Unsafe", destination: "Safe", enabled: true, match: { nameGlobs: ["../*.pdf"] } }] })).toThrow("not a supported file name glob");
+    expect(() => parseInboxConfig({ version: 2, rules: [{ name: "Recursive", destination: "Safe", enabled: true, match: { nameGlobs: ["**.pdf"] } }] })).toThrow("not a supported file name glob");
+    expect(() => parseInboxConfig({ version: 2, rules: [{ name: "Range", destination: "Safe", enabled: true, match: { size: { minBytes: 20, maxBytes: 10 } } }] })).toThrow("cannot exceed");
+    expect(() => parseInboxConfig({ version: 2, rules: [{ name: "Regex", destination: "Safe", enabled: true, match: { regex: ".*" } }] })).toThrow("unsupported field \"regex\"");
+    expect(() => parseInboxConfig({ version: 2, rules: [{ name: "Script", destination: "Safe", enabled: true, script: "return true", match: { extensions: ["txt"] } }] })).toThrow("unsupported field \"script\"");
+  });
+
+  it("previews impact and priority diagnostics without changing files or configuration", async () => {
+    const root = await inbox();
+    const configPath = path.join(root, ".inboxfs.json");
+    const original = JSON.stringify({ version: 1, rules: [{ name: "Research", destination: "Research", extensions: ["pdf"] }] });
+    await writeFile(configPath, original);
+    await writeFile(path.join(root, "paper.pdf"), "paper");
+    await writeFile(path.join(root, "notes.txt"), "notes");
+    const preview = await previewInboxConfig(root, {
+      version: 2,
+      rules: [
+        { name: "Primary PDFs", destination: "Papers", enabled: true, match: { extensions: ["pdf"] } },
+        { name: "Shadowed PDFs", destination: "Archive", enabled: true, match: { extensions: ["pdf"] } },
+        { name: "Notes", destination: "Notes", enabled: true, match: { nameGlobs: ["*.txt"] } },
+      ],
+    });
+    expect(preview.summary).toEqual({ totalFiles: 2, matchedFiles: 2, changedFiles: 2, unmatchedFiles: 0 });
+    expect(preview.rules[0]).toMatchObject({ matchCount: 1, candidateCount: 1, samples: ["paper.pdf"] });
+    expect(preview.rules[1]).toMatchObject({ matchCount: 0, candidateCount: 1, diagnostics: [{ type: "shadowed", message: expect.any(String) }] });
+    expect(preview.changes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "paper.pdf", fromDestination: "Research", toDestination: "Papers" }),
+      expect.objectContaining({ name: "notes.txt", fromDestination: "Documents", toDestination: "Notes" }),
+    ]));
+    expect(await readFile(configPath, "utf8")).toBe(original);
+    expect(await readFile(path.join(root, "paper.pdf"), "utf8")).toBe("paper");
+    expect(await readFile(path.join(root, "notes.txt"), "utf8")).toBe("notes");
   });
 
   it("rejects unsafe and ambiguous custom rules", async () => {
@@ -88,6 +171,17 @@ describe("InboxFS core", () => {
     await writeFile(configPath, JSON.stringify({ version: 1, rules: [{ name: "Papers", extensions: ["pdf"], destination: "Papers" }] }));
     await expect(organizeFiles(root, [scan.suggestions[0].id], ledger)).rejects.toThrow("changed since the preview");
     expect(await readFile(path.join(root, "paper.pdf"), "utf8")).toBe("paper");
+  });
+
+  it("invalidates stale suggestions when rule identity changes without changing the destination", async () => {
+    const root = await inbox();
+    const ledger = path.join(root, ".ledger.json");
+    const configPath = path.join(root, ".inboxfs.json");
+    await writeFile(configPath, JSON.stringify({ version: 2, rules: [{ name: "First", destination: "Research", enabled: true, match: { extensions: ["pdf"] } }] }));
+    await writeFile(path.join(root, "paper.pdf"), "paper");
+    const scan = await scanInbox(root);
+    await writeFile(configPath, JSON.stringify({ version: 2, rules: [{ name: "Renamed", destination: "Research", enabled: true, match: { extensions: ["pdf"] } }] }));
+    await expect(organizeFiles(root, [scan.suggestions[0].id], ledger)).rejects.toThrow("changed since the preview");
   });
 
   it("rejects malformed or symbolic-link configuration files", async () => {

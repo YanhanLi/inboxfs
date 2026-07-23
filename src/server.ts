@@ -7,6 +7,7 @@ import { organizeFiles, undoMove } from "./organizer.js";
 import { scanInbox } from "./scanner.js";
 import { MutationLock } from "./mutation-lock.js";
 import { configDocument, readInboxConfig, writeInboxConfig } from "./config.js";
+import { previewInboxConfig } from "./preview.js";
 
 export function createApp(root: string, webRoot?: string) {
   root = realpathSync(root);
@@ -61,6 +62,9 @@ export function createApp(root: string, webRoot?: string) {
       }
       response.json({ moved: await mutationLock.run(() => organizeFiles(root, request.body.ids)) });
     } catch (error) { next(error); }
+  });
+  app.post("/api/config/preview", async (request, response, next) => {
+    try { response.json(await previewInboxConfig(root, request.body)); } catch (error) { next(error); }
   });
   app.post("/api/undo/:id", async (request, response, next) => {
     try { response.json({ record: await mutationLock.run(() => undoMove(root, request.params.id)) }); } catch (error) { next(error); }

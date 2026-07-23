@@ -25,7 +25,37 @@ export interface Scan {
   suggestions: Suggestion[];
   categoryCounts: Record<string, number>;
   totalSize: number;
-  ruleConfig: { customRuleCount: number; source?: string };
+  ruleConfig: { version: 2; customRuleCount: number; source?: string; migratedFromVersion?: 1 };
+}
+
+export interface RuleMatchDocument {
+  extensions?: string[];
+  nameGlobs?: string[];
+  size?: { minBytes?: number; maxBytes?: number };
+}
+
+export interface RuleDocument {
+  name: string;
+  destination: string;
+  enabled: boolean;
+  match: RuleMatchDocument;
+}
+
+export interface ConfigDocument { version: 2; rules: RuleDocument[] }
+
+export interface ConfigPreview {
+  config: ConfigDocument;
+  summary: { totalFiles: number; matchedFiles: number; changedFiles: number; unmatchedFiles: number };
+  rules: Array<{
+    index: number;
+    name: string;
+    enabled: boolean;
+    matchCount: number;
+    candidateCount: number;
+    samples: string[];
+    diagnostics: Array<{ type: "overlap" | "shadowed"; message: string }>;
+  }>;
+  changes: Array<{ name: string; fromDestination: string; toDestination: string; fromRule?: string; toRule?: string }>;
 }
 
 export interface MoveRecord {

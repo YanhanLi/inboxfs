@@ -21,7 +21,7 @@ test.describe.serial("InboxFS workspace", () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 
-  test("validates and saves custom rules", async ({ page }) => {
+  test("previews, reorders, and saves multi-condition rules", async ({ page }) => {
     await page.route("**/api/config", async (route) => {
       await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "Configuration service unavailable" }) });
     });
@@ -35,24 +35,67 @@ test.describe.serial("InboxFS workspace", () => {
     await dialog.getByRole("button", { name: "Try again", exact: true }).click();
     await expect(dialog.getByRole("button", { name: "Add rule", exact: true })).toBeVisible();
     await dialog.getByRole("button", { name: "Add rule", exact: true }).click();
-    const secondRule = dialog.getByRole("group", { name: "Rule 2", exact: true });
+    const secondRule = dialog.getByRole("group", { name: "Priority 2", exact: true });
     await secondRule.getByLabel("Name", { exact: true }).fill("Books");
     await secondRule.getByLabel("Destination", { exact: true }).fill("Books");
     await secondRule.getByLabel("Extensions", { exact: true }).fill("epub");
-    await dialog.getByRole("button", { name: "Save rules", exact: true }).click();
-    await expect(dialog.getByRole("alert")).toContainText("assigned to both");
-
-    await secondRule.getByLabel("Extensions", { exact: true }).fill("cbz");
+    await secondRule.getByLabel("File name globs", { exact: true }).fill("chapter*");
+    await secondRule.getByLabel("Maximum bytes", { exact: true }).fill("10");
+    await secondRule.getByLabel("Enabled", { exact: true }).uncheck();
+    await expect(secondRule.getByText("Disabled", { exact: true })).toBeVisible();
+    await secondRule.getByLabel("Enabled", { exact: true }).check();
+    await expect(secondRule.getByText("fully shadowed", { exact: false })).toBeVisible();
+    await secondRule.getByRole("button", { name: "Move Books up", exact: true }).click();
+    const firstRule = dialog.getByRole("group", { name: "Priority 1", exact: true });
+    await expect(firstRule.getByLabel("Name", { exact: true })).toHaveValue("Books");
+    await expect(firstRule.getByText("1 match", { exact: true })).toBeVisible();
+    await expect(dialog.getByText("1 destination change", { exact: true })).toBeVisible();
+    const unsavedConfig = await page.request.get("/api/config");
+    expect((await unsavedConfig.json()).rules).toHaveLength(1);
+    const unsavedScan = await page.request.get("/api/scan");
+    expect((await unsavedScan.json()).suggestions.find((item: { name: string }) => item.name === "chapter.epub").category).toBe("Reading");
+    const accessibility = await new AxeBuilder({ page }).include(".rules-dialog").analyze();
+    expect(accessibility.violations).toEqual([]);
     await dialog.getByRole("button", { name: "Save rules", exact: true }).click();
     await expect(page.getByRole("status")).toContainText("2 custom rules saved.");
     await expect(page.getByRole("button", { name: "Rules 2", exact: true })).toBeVisible();
+  });
+
+  test("rejects unsafe globs without losing the rule draft", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Rules 2", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Custom rules", exact: true });
+    const firstRule = dialog.getByRole("group", { name: "Priority 1", exact: true });
+    await expect(firstRule.getByLabel("Name", { exact: true })).toHaveValue("Books");
+    await firstRule.getByLabel("File name globs", { exact: true }).fill("../*.epub");
+    await expect(dialog.getByText("not a supported file name glob", { exact: false })).toBeVisible();
+    await dialog.getByRole("button", { name: "Save rules", exact: true }).click();
+    await expect(dialog.getByRole("alert")).toContainText("not a supported file name glob");
+    await expect(firstRule.getByLabel("Name", { exact: true })).toHaveValue("Books");
+    await firstRule.getByLabel("File name globs", { exact: true }).fill("chapter*");
+    await expect(firstRule.getByText("1 match", { exact: true })).toBeVisible();
+    await dialog.getByRole("button", { name: "Save rules", exact: true }).click();
+    await expect(page.locator(".notice")).toContainText("2 custom rules saved.");
+  });
+
+  test("keeps the rule editor operable at mobile width", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Edit classification rules", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Custom rules", exact: true });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("group", { name: "Priority 1", exact: true }).getByLabel("Name", { exact: true })).toHaveValue("Books");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    const accessibility = await new AxeBuilder({ page }).include(".rules-dialog").analyze();
+    expect(accessibility.violations).toEqual([]);
+    await dialog.getByRole("button", { name: "Close custom rules", exact: true }).click();
   });
 
   test("inspects, organizes, loads history, and undoes", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("button", { name: "Inspect chapter.epub", exact: true }).click();
     const details = page.getByRole("dialog", { name: "Details", exact: true });
-    await expect(details).toContainText("Custom rule “Reading”");
+    await expect(details).toContainText("Custom rule “Books”");
     await details.getByRole("button", { name: "Close file details", exact: true }).click();
 
     await page.getByRole("button", { name: "Organize 2", exact: true }).click();

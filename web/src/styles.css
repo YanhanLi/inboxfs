@@ -248,14 +248,14 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--primary)
 .plan-control > div { min-width: 0; }
 .plan-control label { min-width: 78px; min-height: 44px; color: var(--text-secondary); display: flex; align-items: center; justify-content: end; gap: 8px; font-size: 11px; font-weight: 700; }
 .plan-control input { width: 18px; height: 18px; }
-.rules-dialog { width: min(560px, 100vw); max-width: none; height: 100dvh; max-height: none; margin: 0 0 0 auto; padding: 0; border: 0; border-left: 1px solid var(--border); background: var(--surface); color: var(--text); box-shadow: -12px 0 32px #0003; }
+.rules-dialog { width: min(680px, 100vw); max-width: none; height: 100dvh; max-height: none; margin: 0 0 0 auto; padding: 0; border: 0; border-left: 1px solid var(--border); background: var(--surface); color: var(--text); box-shadow: -12px 0 32px #0003; }
 .rules-dialog::backdrop { background: #0c0d0e99; }
 .rules-panel { min-height: 100%; display: grid; grid-template-rows: auto 1fr auto; background: var(--surface); }
 .rules-header { min-height: 76px; padding: 14px 18px 14px 22px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .rules-header > div { display: grid; gap: 3px; }
 .rules-header span { color: var(--green); font-size: 10px; font-weight: 750; text-transform: uppercase; }
 .rules-header h2 { margin: 0; font-size: 18px; }
-.rules-body { min-height: 0; overflow-y: auto; padding: 8px 22px 28px; }
+.rules-body { min-height: 0; overflow-y: auto; padding: 8px 24px 28px; }
 .rules-loading, .rules-empty { min-height: 260px; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; font-size: 12px; }
 .rules-empty strong { color: var(--text); font-size: 14px; }
 .rules-empty button, .rules-error button { min-height: 36px; border: 0; background: transparent; color: var(--green); font-size: 12px; font-weight: 700; }
@@ -263,16 +263,33 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--primary)
 .rules-error svg { align-self: start; margin-top: 1px; }
 .rules-error button { color: var(--danger); white-space: nowrap; }
 .rules-error-actions { display: flex; align-items: center; gap: 4px; }
-.rule-editor { position: relative; margin: 0; padding: 22px 0 20px; border: 0; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
-.rule-editor legend { padding: 0; color: var(--text); font-size: 12px; font-weight: 750; }
+.rules-impact { margin: 8px -24px 0; padding: 14px 24px; border-block: 1px solid var(--border); background: var(--surface-muted); color: var(--text-secondary); display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px 14px; }
+.rules-impact > div { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.rules-impact strong { color: var(--text); font-size: 12px; }
+.rules-impact span, .rules-impact small { color: var(--text-muted); font-size: 10px; }
+.rules-impact ul { grid-column: 1 / -1; margin: 2px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.rules-impact li { display: flex; justify-content: space-between; gap: 14px; font-size: 10px; }
+.rules-impact li b { min-width: 0; overflow: hidden; color: var(--text-secondary); text-overflow: ellipsis; white-space: nowrap; }
+.rule-editor { position: relative; margin: 0; padding: 24px 0 20px; border: 0; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+.rule-editor legend { padding: 0 0 2px; color: var(--text); font-size: 12px; font-weight: 750; }
+.rule-controls { position: absolute; top: 7px; right: 0; display: flex; align-items: center; gap: 4px; }
+.rule-controls .icon-button { width: 34px; height: 34px; border-color: transparent; }
+.rule-enabled { min-height: 34px; margin-right: 4px; padding: 0 8px; color: var(--text-secondary); display: flex !important; grid-auto-flow: column; align-items: center; gap: 6px !important; font-size: 10px; font-weight: 700; }
+.rule-enabled input { width: 15px; height: 15px; }
 .rule-editor label { min-width: 0; display: grid; gap: 6px; }
 .rule-editor label > span { color: var(--text-muted); font-size: 10px; font-weight: 700; text-transform: uppercase; }
 .rule-editor input { width: 100%; height: 42px; padding: 0 11px; border: 1px solid var(--border); border-radius: var(--radius); outline: 0; background: var(--surface-muted); color: var(--text); cursor: text; }
+.rule-editor input[type="checkbox"] { height: 15px; padding: 0; cursor: pointer; }
 .rule-editor input::placeholder { color: var(--placeholder); }
 .rule-editor input:focus { border-color: var(--focus); box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 18%, transparent); }
-.rule-extensions { grid-column: 1 / -1; }
-.rule-delete { position: absolute; top: 10px; right: -8px; width: 40px; height: 40px; border: 0; border-radius: var(--radius); background: transparent; color: var(--text-muted); display: grid; place-items: center; }
+.rule-wide { grid-column: 1 / -1; }
+.rule-delete { color: var(--text-muted); }
 .rule-delete:hover { background: var(--danger-soft); color: var(--danger); }
+.rule-result { grid-column: 1 / -1; min-width: 0; padding-top: 12px; border-top: 1px solid var(--border-soft); display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 5px 12px; }
+.rule-result strong { color: var(--green); font-size: 11px; }
+.rule-result > span { overflow: hidden; color: var(--text-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.rule-result small { grid-column: 1 / -1; color: var(--amber-text); display: flex; align-items: center; gap: 6px; font-size: 10px; line-height: 1.4; }
+.rule-result small svg { flex: 0 0 auto; }
 .add-rule { min-height: 44px; margin-top: 16px; padding: 0 12px; border: 1px dashed var(--border-strong); border-radius: var(--radius); background: transparent; color: var(--green); display: flex; align-items: center; justify-content: center; gap: 7px; font-size: 12px; font-weight: 700; }
 .add-rule:hover:not(:disabled) { background: var(--green-soft); }
 .add-rule:disabled { opacity: .45; }
@@ -352,7 +369,10 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--primary)
   .rules-dialog { width: 100vw; border-left: 0; }
   .rules-body { padding-inline: 16px; }
   .rule-editor { grid-template-columns: 1fr; }
-  .rule-extensions { grid-column: auto; }
+  .rule-wide { grid-column: auto; }
+  .rules-impact { margin-inline: -16px; padding-inline: 16px; }
+  .rules-impact > div { align-items: start; flex-direction: column; gap: 3px; }
+  .rule-controls { position: static; grid-row: 1; margin: -6px 0 2px; justify-content: end; }
 }
 
 @media (max-width: 390px) {
