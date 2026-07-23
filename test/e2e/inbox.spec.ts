@@ -5,6 +5,7 @@ test.describe.serial("InboxFS workspace", () => {
   test("meets desktop, theme, mobile, and accessibility baselines", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByText("Watching", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Inspect chapter.epub", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Rules 1", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Reading 1", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Local AI", exact: true })).toBeVisible();
@@ -182,10 +183,10 @@ test.describe.serial("InboxFS workspace", () => {
   });
 
   test("recovers when lazy summary and panel chunks fail", async ({ page }) => {
-    await page.route(/Summary-.*\.js$/, async (route) => route.abort());
+    await page.route(/(?:^|\/)Summary-[^/]+\.js$/, async (route) => route.abort());
     await page.goto("/");
     await expect(page.getByRole("alert")).toContainText("Panel unavailable");
-    await page.unroute(/Summary-.*\.js$/);
+    await page.unroute(/(?:^|\/)Summary-[^/]+\.js$/);
     await page.getByRole("button", { name: "Reload workspace", exact: true }).click();
     await expect(page.getByRole("region", { name: "Inbox summary", exact: true })).toBeVisible();
 
