@@ -208,7 +208,7 @@ export function App() {
           <label className="search-field"><span className="sr-only">Search files</span><Search size={17} aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by file name" /></label>
           <label className="sort-field"><span className="sr-only">Sort files</span><ArrowUpDown size={16} aria-hidden="true" /><select value={sort} onChange={(event) => setSort(event.target.value as SortOption)}><option value="name-asc">Name A-Z</option><option value="modified-desc">Newest first</option><option value="size-desc">Largest first</option><option value="destination-asc">Destination</option></select></label>
           {selected.size > 0 && <button className="clear-button" onClick={() => setFilteredSelected(false)}>Clear selection</button>}
-          <button className="primary" disabled={busy || !selected.size || Boolean(scanError)} onClick={() => void organize()}><ArchiveRestore size={17} aria-hidden="true" /><span>Organize {selected.size || "selected"}</span></button>
+          <button className="primary" disabled={busy || !selected.size || Boolean(scanError)} onClick={organize}><ArchiveRestore size={17} aria-hidden="true" /><span>Organize {selected.size || "selected"}</span></button>
         </div>
 
         <div className="plan-summary" aria-live="polite">
@@ -243,7 +243,7 @@ export function App() {
       <section className="activity" id="activity" aria-labelledby="activity-heading">
         <div className="section-heading"><div><h2 id="activity-heading">Recent activity</h2><p>{history.length} moves recorded</p></div></div>
         <div className="history-list">
-          {history.length > 0 && <Suspense fallback={null}><HistoryList records={history} busy={busy} onUndo={(id) => void undo(id)} /></Suspense>}
+          {history.length > 0 && <Suspense fallback={null}><HistoryList records={history} busy={busy} onUndo={undo} /></Suspense>}
           {!history.length && <div className="activity-empty"><History size={18} aria-hidden="true" /><span>Organized files will appear here.</span></div>}
         </div>
       </section>
