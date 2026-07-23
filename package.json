@@ -11,6 +11,8 @@
     "web-dist",
     "README.md",
     "CHANGELOG.md",
+    "SECURITY.md",
+    "docs",
     "LICENSE"
   ],
   "scripts": {
