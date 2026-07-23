@@ -6,6 +6,7 @@ import { assertInsideRoot } from "./path-safety.js";
 import { scanInbox } from "./scanner.js";
 import type { MoveRecord } from "./model.js";
 import { hashFile } from "./file-hash.js";
+import { safeDestination } from "./ai/settings.js";
 
 interface OrganizerOperations {
   renameFile(source: string, destination: string): Promise<void>;
@@ -13,11 +14,31 @@ interface OrganizerOperations {
 
 const defaultOperations: OrganizerOperations = { renameFile: rename };
 
+async function availableOverrideDestination(root: string, destination: string, filename: string, reserved: Set<string>): Promise<string> {
+  const folder = safeDestination(destination, "AI destination");
+  const parsed = path.parse(filename);
+  for (let index = 1; index < 10_000; index += 1) {
+    const name = index === 1 ? filename : `${parsed.name} (${index})${parsed.ext}`;
+    const candidate = path.join(root, folder, name);
+    assertInsideRoot(root, candidate);
+    if (reserved.has(candidate)) continue;
+    try { await lstat(candidate); } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        reserved.add(candidate);
+        return candidate;
+      }
+      throw error;
+    }
+  }
+  throw new Error(`Unable to find an available name for ${filename}`);
+}
+
 export async function organizeFiles(
   root: string,
   suggestionIds: string[],
   ledgerPath?: string,
-  operations: OrganizerOperations = defaultOperations
+  operations: OrganizerOperations = defaultOperations,
+  destinationOverrides: Map<string, string> = new Map()
 ): Promise<MoveRecord[]> {
   const canonicalRoot = await realpath(root);
   const activeLedgerPath = ledgerPath ?? await resolveLedgerPath(canonicalRoot);
@@ -25,24 +46,31 @@ export async function organizeFiles(
   const requested = new Set(suggestionIds);
   const selected = scan.suggestions.filter((item) => requested.has(item.id));
   if (selected.length !== requested.size) throw new Error("One or more files changed since the preview. Refresh and try again.");
+  for (const id of destinationOverrides.keys()) {
+    if (!requested.has(id)) throw new Error("AI decisions must only reference files selected for organization.");
+  }
 
   const records = await readLedger(activeLedgerPath);
   const batchId = randomUUID();
   const prepared: MoveRecord[] = [];
+  const reserved = new Set<string>();
   for (const item of selected) {
+    const destinationPath = destinationOverrides.has(item.id)
+      ? await availableOverrideDestination(canonicalRoot, destinationOverrides.get(item.id)!, item.name, reserved)
+      : item.destinationPath;
     assertInsideRoot(canonicalRoot, item.sourcePath);
-    assertInsideRoot(canonicalRoot, item.destinationPath);
+    assertInsideRoot(canonicalRoot, destinationPath);
     const sourceMetadata = await lstat(item.sourcePath);
     if (!sourceMetadata.isFile() || sourceMetadata.isSymbolicLink()) throw new Error("Only regular files can be organized.");
-    await mkdir(path.dirname(item.destinationPath), { recursive: true });
-    assertInsideRoot(canonicalRoot, await realpath(path.dirname(item.destinationPath)));
+    await mkdir(path.dirname(destinationPath), { recursive: true });
+    assertInsideRoot(canonicalRoot, await realpath(path.dirname(destinationPath)));
     const contentHash = await hashFile(item.sourcePath);
     prepared.push({
       id: randomUUID(),
       batchId,
       createdAt: new Date().toISOString(),
       sourcePath: item.sourcePath,
-      destinationPath: item.destinationPath,
+      destinationPath,
       contentHash
     });
   }
