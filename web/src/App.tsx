@@ -19,13 +19,14 @@ import {
 } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { json } from "./api";
-import type { MoveRecord, Scan, Suggestion } from "./types";
+import type { AiDecision, AiPlanItem, AiReviewItem, MoveRecord, RuleDocument, Scan, Suggestion } from "./types";
 
 const RulesDialog = lazy(() => import("./RulesDialog").catch(() => import("./LoadError")));
 const Inspector = lazy(() => import("./Inspector").catch(() => import("./LoadError")));
 const Summary = lazy(() => import("./Summary").catch(() => import("./LoadError")));
 const Activity = lazy(() => import("./Activity").catch(() => import("./LoadError")));
 const FileRows = lazy(() => import("./FileRows").catch(() => import("./LoadError")));
+const AiDialog = lazy(() => import("./AiDialog").catch(() => import("./LoadError")));
 
 type Theme = "light" | "dark";
 type SortOption = "name-asc" | "modified-desc" | "size-desc" | "destination-asc";
@@ -56,6 +57,9 @@ export function App() {
   const [scanError, setScanError] = useState("");
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [ruleSeed, setRuleSeed] = useState<RuleDocument>();
+  const [aiPlan, setAiPlan] = useState<{ jobId: string; decisions: AiDecision[] }>();
   const selectionOverrides = useRef<Map<string, boolean>>(new Map());
   const refreshSequence = useRef(0);
 
@@ -75,6 +79,7 @@ export function App() {
       const [nextScan, nextHistory] = await Promise.all([json<Scan>("/api/scan"), json<MoveRecord[]>("/api/history")]);
       if (sequence !== refreshSequence.current) return;
       setScan(nextScan); setHistory(nextHistory);
+      setAiPlan(undefined);
       setScanError("");
       if (!preserveSelection) selectionOverrides.current.clear();
       const available = new Set(nextScan.suggestions.map((item) => item.id));
@@ -106,6 +111,7 @@ export function App() {
     return first.name.localeCompare(second.name);
   }), [filtered, sort]);
   const duplicateCount = scan?.suggestions.filter((item) => item.duplicateOf).length ?? 0;
+  const unmatchedCount = scan?.suggestions.filter((item) => item.classification.type === "fallback").length ?? 0;
   const categories = ["All files", ...(duplicateCount ? ["Duplicates"] : []), ...Object.keys(scan?.categoryCounts ?? {})];
   const selectedSize = (scan?.suggestions ?? []).filter((item) => selected.has(item.id)).reduce((total, item) => total + item.size, 0);
   const selectedDestinations = new Set((scan?.suggestions ?? []).filter((item) => selected.has(item.id)).map((item) => parentFolder(item.destinationPath))).size;
@@ -138,11 +144,32 @@ export function App() {
 
   function openRules() {
     setInspectedId(undefined);
+    setRuleSeed(undefined);
     setRulesOpen(true);
+  }
+
+  function openAi() {
+    setInspectedId(undefined);
+    setAiOpen(true);
+  }
+
+  function createRuleFromAi(rule: RuleDocument) {
+    setAiOpen(false);
+    setRuleSeed(rule);
+    setRulesOpen(true);
+  }
+
+  async function applyAiPlan(jobId: string, decisions: AiDecision[], plan: AiPlanItem[], results: AiReviewItem[]) {
+    const { mergeAiPlan } = await import("./ai-plan");
+    setAiPlan({ jobId, decisions });
+    setScan((current) => current ? mergeAiPlan(current, plan, results) : current);
+    setSelected((current) => new Set([...current, ...decisions.map((item) => item.id)]));
+    setNotice("Local suggestions added to the plan.");
   }
 
   async function rulesSaved(count: number) {
     setRulesOpen(false);
+    setRuleSeed(undefined);
     setNotice(`${count} custom rule${count === 1 ? "" : "s"} saved.`);
     await refresh(true);
   }
@@ -151,7 +178,9 @@ export function App() {
     if (!selected.size) return;
     setBusy(true); setNotice("");
     try {
-      const result = await json<{ moved: MoveRecord[] }>("/api/organize", { method: "POST", body: JSON.stringify({ ids: [...selected] }) });
+      const decisions = aiPlan?.decisions.filter((item) => selected.has(item.id)) ?? [];
+      const body = { ids: [...selected], ...(aiPlan && decisions.length ? { aiJobId: aiPlan.jobId, aiDecisions: decisions } : {}) };
+      const result = await json<{ moved: MoveRecord[] }>("/api/organize", { method: "POST", body: JSON.stringify(body) });
       setNotice(`${result.moved.length} file${result.moved.length === 1 ? "" : "s"} organized.`);
       await refresh();
     } catch (error) { setNotice(error instanceof Error ? error.message : "Unable to organize files"); setBusy(false); }
@@ -175,6 +204,7 @@ export function App() {
         </button>)}
         <p className="nav-label nav-label-secondary">Workspace</p>
         <button onClick={openRules}><SlidersHorizontal size={17} aria-hidden="true" /><span>Rules</span><b>{scan?.ruleConfig.customRuleCount ?? 0}</b></button>
+        <button onClick={openAi}><ClipboardCheck size={17} aria-hidden="true" /><span>Local AI</span><b>{unmatchedCount}</b></button>
         <button onClick={() => document.getElementById("activity")?.scrollIntoView()}><History size={17} aria-hidden="true" /><span>Activity</span></button>
       </nav>
       <div className="privacy"><ShieldCheck size={18} aria-hidden="true" /><div><strong>On-device only</strong><small>Nothing is uploaded.</small></div></div>
@@ -187,6 +217,7 @@ export function App() {
           <span className="status-dot" aria-hidden="true" />
           <div><strong>{busy ? "Scanning" : "Watching"}</strong><small>{scan ? `Updated ${new Date(scan.scannedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Connecting"}</small></div>
           <button className="icon-button mobile-rules-button" aria-label="Edit classification rules" title="Edit rules" onClick={openRules}><SlidersHorizontal size={18} /></button>
+          <button className="icon-button mobile-rules-button" aria-label="Review unmatched files with local AI" title="Local AI review" onClick={openAi}><ClipboardCheck size={18} /></button>
           <button className="icon-button" aria-label={`Use ${theme === "light" ? "dark" : "light"} theme`} title="Change theme" onClick={() => setTheme(theme === "light" ? "dark" : "light")}>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</button>
           <button className="icon-button" aria-label="Scan folder again" title="Scan again" onClick={() => { setNotice(""); void refresh(); }} disabled={busy}><RefreshCw size={18} className={busy ? "spin" : ""} /></button>
         </div>
@@ -233,6 +264,7 @@ export function App() {
 
     {inspected && <Suspense fallback={asyncFallback}><Inspector item={inspected} included={selected.has(inspected.id)} onClose={() => setInspectedId(undefined)} onSelected={(value) => setItemSelected(inspected.id, value)} /></Suspense>}
 
-    {rulesOpen && <Suspense fallback={asyncFallback}><RulesDialog onClose={() => setRulesOpen(false)} onSaved={rulesSaved} /></Suspense>}
+    {rulesOpen && <Suspense fallback={asyncFallback}><RulesDialog initialRule={ruleSeed} onClose={() => { setRulesOpen(false); setRuleSeed(undefined); }} onSaved={rulesSaved} /></Suspense>}
+    {aiOpen && scan && <Suspense fallback={asyncFallback}><AiDialog scan={scan} onClose={() => setAiOpen(false)} onApplied={applyAiPlan} onCreateRule={createRuleFromAi} /></Suspense>}
   </div>;
 }

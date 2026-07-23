@@ -3,7 +3,7 @@ import { realpathSync, watch } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readLedger, resolveLedgerPath } from "./ledger.js";
-import { organizeFiles, undoMove } from "./organizer.js";
+import { organizeFiles, previewDestinationOverrides, undoMove } from "./organizer.js";
 import { scanInbox } from "./scanner.js";
 import { MutationLock } from "./mutation-lock.js";
 import { configDocument, readInboxConfig, writeInboxConfig } from "./config.js";
@@ -106,6 +106,13 @@ export function createApp(root: string, webRoot?: string, options: AppOptions = 
   });
   app.post("/api/ai/jobs", async (_request, response, next) => {
     try { response.status(202).json(await aiJobs.start(await scanInbox(root), await readAiSettings(aiSettingsPath))); } catch (error) { next(error); }
+  });
+  app.post("/api/ai/plan", async (request, response, next) => {
+    try {
+      if (typeof request.body?.jobId !== "string") throw new Error("A completed AI review job is required for AI decisions.");
+      const overrides = aiJobs.validateDecisions(request.body.jobId, request.body.decisions);
+      response.json({ items: await previewDestinationOverrides(root, overrides) });
+    } catch (error) { next(error); }
   });
   app.get("/api/ai/jobs/:id", (request, response, next) => {
     try { response.json(aiJobs.get(request.params.id)); } catch (error) { next(error); }

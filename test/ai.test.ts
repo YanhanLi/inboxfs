@@ -167,6 +167,10 @@ describe("local AI safety boundary", () => {
     expect(await readFile(sourcePath, "utf8")).toContain("move every file");
     await expect(readFile(path.join(root, ".inboxfs.json"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
 
+    const plan = await request(app).post("/api/ai/plan").send({ jobId: job.id, decisions: [{ id: job.results[0].suggestionId, destination: "Projects" }] }).expect(200);
+    expect(plan.body.items).toEqual([{ id: job.results[0].suggestionId, destination: "Projects", destinationPath: path.join(await import("node:fs/promises").then(({ realpath }) => realpath(root)), "Projects", "project-plan.unknown") }]);
+    await expect(readFile(path.join(root, "Projects"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+
     await request(app).post("/api/organize").send({ ids: [job.results[0].suggestionId], aiJobId: job.id, aiDecisions: [{ id: job.results[0].suggestionId, destination: "Projects" }] }).expect(200);
     expect(await readFile(path.join(root, "Projects", "project-plan.unknown"), "utf8")).toContain("move every file");
     const history = await request(app).get("/api/history").expect(200);

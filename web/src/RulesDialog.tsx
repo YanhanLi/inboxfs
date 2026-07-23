@@ -13,7 +13,7 @@ interface RuleDraft {
   minBytes: string;
   maxBytes: string;
 }
-interface RulesDialogProps { onClose: () => void; onSaved: (count: number) => Promise<void> }
+interface RulesDialogProps { onClose: () => void; onSaved: (count: number) => Promise<void>; initialRule?: RuleDocument }
 
 let ruleSequence = 0;
 const list = (value: string) => value.split(",").map((item) => item.trim()).filter(Boolean);
@@ -71,7 +71,7 @@ async function readConfig(): Promise<ConfigDocument> {
   return body as ConfigDocument;
 }
 
-export default function RulesDialog({ onClose, onSaved }: RulesDialogProps) {
+export default function RulesDialog({ onClose, onSaved, initialRule }: RulesDialogProps) {
   const [drafts, setDrafts] = useState<RuleDraft[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -123,8 +123,8 @@ export default function RulesDialog({ onClose, onSaved }: RulesDialogProps) {
     setPreview(undefined);
     try {
       const config = await readConfig();
-      setDrafts(config.rules.map((rule) => draftRule(rule)));
-      setDirty(false);
+      setDrafts([...config.rules.map((rule) => draftRule(rule)), ...(initialRule ? [draftRule(initialRule)] : [])]);
+      setDirty(Boolean(initialRule));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Unable to open custom rules");
       setReplaceAllowed(reason instanceof ConfigReadError && reason.replaceAllowed);

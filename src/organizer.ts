@@ -33,6 +33,20 @@ async function availableOverrideDestination(root: string, destination: string, f
   throw new Error(`Unable to find an available name for ${filename}`);
 }
 
+export async function previewDestinationOverrides(root: string, destinationOverrides: Map<string, string>): Promise<Array<{ id: string; destination: string; destinationPath: string }>> {
+  const canonicalRoot = await realpath(root);
+  const scan = await scanInbox(canonicalRoot);
+  const suggestions = new Map(scan.suggestions.map((item) => [item.id, item]));
+  const reserved = new Set<string>();
+  const result: Array<{ id: string; destination: string; destinationPath: string }> = [];
+  for (const [id, destination] of destinationOverrides) {
+    const item = suggestions.get(id);
+    if (!item) throw new Error("One or more files changed since the AI preview. Refresh and try again.");
+    result.push({ id, destination, destinationPath: await availableOverrideDestination(canonicalRoot, destination, item.name, reserved) });
+  }
+  return result;
+}
+
 export async function organizeFiles(
   root: string,
   suggestionIds: string[],
