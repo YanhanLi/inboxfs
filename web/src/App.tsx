@@ -165,10 +165,7 @@ export function App() {
   }
 
   function toggleTheme() {
-    const next = theme === "light" ? "dark" : "light";
-    document.documentElement.dataset.theme = next;
-    try { localStorage.setItem("inboxfs-theme", next); } catch { /* Theme still applies for this session. */ }
-    setTheme(next);
+    setTheme((current) => current === "light" ? "dark" : "light");
   }
 
   async function openRules() {
