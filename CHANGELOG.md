@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.12.0
+
+- Add `--demo`, which creates an isolated seven-file sample inbox without reading user files and removes it when InboxFS stops.
+- Add side-effect-free `--help`, strict CLI argument validation, signal cleanup, and real-process lifecycle coverage.
+- Mark demo scans on the server so desktop and mobile interfaces clearly identify the temporary sample workspace.
+- Add a complete Simplified Chinese README, bilingual navigation, synchronized safety limits, and package inclusion checks.
+- Expand the quality gate to 55 unit/HTTP/documentation checks and ten Chromium workflows while retaining the existing bundle and performance budgets.
+
 ## 0.11.0
 
 - Let users explicitly review 1 to 100 currently selected files while keeping unmatched-only review as the default and deterministic rules first.

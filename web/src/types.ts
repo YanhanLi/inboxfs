@@ -25,6 +25,7 @@ export interface Suggestion {
 
 export interface Scan {
   root: string;
+  demo: boolean;
   scannedAt: string;
   suggestions: Suggestion[];
   categoryCounts: Record<string, number>;

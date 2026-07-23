@@ -18,6 +18,7 @@ export interface AppOptions {
   aiProvider?: AiProvider;
   aiSettingsPath?: string;
   aiCachePath?: string;
+  demo?: boolean;
 }
 
 export function createApp(root: string, webRoot?: string, options: AppOptions = {}) {
@@ -44,7 +45,7 @@ export function createApp(root: string, webRoot?: string, options: AppOptions = 
   });
 
   app.get("/api/scan", async (_request, response, next) => {
-    try { response.json(await scanInbox(root)); } catch (error) { next(error); }
+    try { response.json({ ...await scanInbox(root), demo: options.demo === true }); } catch (error) { next(error); }
   });
   app.get("/api/history", async (_request, response, next) => {
     try { response.json((await readLedger(await resolveLedgerPath(root))).slice().reverse()); } catch (error) { next(error); }

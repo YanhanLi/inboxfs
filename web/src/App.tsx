@@ -198,7 +198,7 @@ export function App() {
 
     <main id="main-content">
       <header className="topbar">
-        <div className="page-title"><span className="eyebrow">Workspace</span><h1>File inbox</h1><p title={scan?.root}><HardDrive size={14} aria-hidden="true" />{scan?.root ?? "Scanning folder..."}</p></div>
+        <div className="page-title"><span className="eyebrow">{scan?.demo ? "Temporary demo" : "Workspace"}</span><h1>{scan?.demo ? "Sample inbox" : "File inbox"}</h1><p title={scan?.root}><HardDrive size={14} aria-hidden="true" />{scan?.root ?? "Scanning folder..."}</p></div>
         <div className="scan-status">
           <span className="status-dot" aria-hidden="true" />
           <div><strong>{busy ? "Scanning" : "Watching"}</strong><small>{scan ? `Updated ${new Date(scan.scannedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Connecting"}</small></div>

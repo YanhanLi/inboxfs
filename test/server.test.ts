@@ -21,6 +21,13 @@ describe("local HTTP boundary", () => {
     const response = await request(app).get("/api/scan").expect(200);
     expect(response.body.suggestions).toHaveLength(1);
     expect(response.body.suggestions[0].classification.pattern).toBe("*.txt");
+    expect(response.body.demo).toBe(false);
+  });
+
+  it("marks only explicitly configured demo scans", async () => {
+    const { root } = await fixture();
+    const response = await request(createApp(root, undefined, { demo: true })).get("/api/scan").expect(200);
+    expect(response.body.demo).toBe(true);
   });
 
   it("uses one ledger identity when the inbox is opened through a symbolic link", async () => {

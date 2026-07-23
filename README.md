@@ -1,5 +1,7 @@
 # InboxFS
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 InboxFS is a local-first file inbox. It scans loose files in a folder, previews clear category destinations, moves only the files you select, and lets you safely undo unchanged moves.
 
 It runs on `127.0.0.1`. File names and contents are not uploaded anywhere.
@@ -12,6 +14,14 @@ It runs on `127.0.0.1`. File names and contents are not uploaded anywhere.
 ## Try it
 
 InboxFS requires Node.js 22.5 or newer.
+
+Try an isolated sample inbox first. It does not read or modify your files, and the temporary workspace is removed when InboxFS stops:
+
+```bash
+npx github:YanhanLi/inboxfs --demo
+```
+
+Then open a real folder:
 
 ```bash
 npx github:YanhanLi/inboxfs ~/Downloads

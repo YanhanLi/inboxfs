@@ -1,5 +1,8 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { spawn } from "node:child_process";
+import { access } from "node:fs/promises";
+import path from "node:path";
 
 test.describe.serial("InboxFS workspace", () => {
   test("meets desktop, theme, mobile, and accessibility baselines", async ({ page }) => {
@@ -235,5 +238,40 @@ test.describe.serial("InboxFS workspace", () => {
     await page.getByRole("button", { name: "Reload workspace", exact: true }).click();
     await page.getByRole("button", { name: "Local AI", exact: true }).click();
     await expect(page.getByRole("dialog", { name: "Review unmatched files", exact: true })).toBeVisible();
+  });
+
+  test("opens and removes an isolated demo workspace", async ({ page }) => {
+    const child = spawn(process.execPath, [path.resolve("dist/cli.js"), "--demo", "--no-open"], { stdio: ["ignore", "pipe", "pipe"] });
+    let output = "";
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => { output += chunk; });
+    let root = "";
+    try {
+      const match = await new Promise<RegExpMatchArray>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error(`Demo CLI did not start:\n${output}`)), 5_000);
+        child.stdout.on("data", () => {
+          const found = output.match(/InboxFS demo is ready in (.+)\n(http:\/\/127\.0\.0\.1:\d+)/);
+          if (!found) return;
+          clearTimeout(timeout);
+          resolve(found);
+        });
+        child.once("error", reject);
+      });
+      root = match[1];
+      await page.goto(match[2]);
+      await expect(page.getByText("Temporary demo", { exact: true })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Sample inbox", exact: true })).toBeVisible();
+      await expect(page.getByText("7 of 7 files", { exact: false })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Inspect mystery.xyzzy", exact: true })).toBeVisible();
+      const accessibility = await new AxeBuilder({ page }).analyze();
+      expect(accessibility.violations).toEqual([]);
+    } finally {
+      if (child.exitCode === null && child.signalCode === null) {
+        const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
+        child.kill("SIGTERM");
+        await exited;
+      }
+    }
+    await expect(access(root)).rejects.toThrow();
   });
 });
