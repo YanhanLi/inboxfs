@@ -7,6 +7,7 @@ test.describe.serial("InboxFS workspace", () => {
     await expect(page.getByText("Watching", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Rules 1", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Reading 1", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Local AI 1", exact: true })).toBeVisible();
 
     const accessibility = await new AxeBuilder({ page }).analyze();
     expect(accessibility.violations).toEqual([]);
@@ -18,6 +19,7 @@ test.describe.serial("InboxFS workspace", () => {
 
     await page.setViewportSize({ width: 390, height: 844 });
     await expect(page.getByRole("button", { name: "Edit classification rules", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Review unmatched files with local AI", exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 
@@ -91,20 +93,78 @@ test.describe.serial("InboxFS workspace", () => {
     await dialog.getByRole("button", { name: "Close custom rules", exact: true }).click();
   });
 
-  test("inspects, organizes, loads history, and undoes", async ({ page }) => {
+  test("configures, cancels, reviews, and applies local AI suggestions without moving files", async ({ page }) => {
     await page.goto("/");
+    await page.getByRole("button", { name: "Local AI 1", exact: true }).click();
+    let dialog = page.getByRole("dialog", { name: "Review unmatched files", exact: true });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText("1 local model ready", { exact: true })).toBeVisible();
+    await dialog.getByLabel("Enabled", { exact: true }).check();
+    await dialog.getByLabel("Allowed destinations", { exact: true }).fill("Projects, Archive");
+    await dialog.getByLabel("Read supported text locally", { exact: false }).check();
+    await dialog.getByRole("button", { name: "Save configuration", exact: true }).click();
+    await expect(dialog.getByRole("button", { name: "Analyze", exact: true })).toBeEnabled();
+    await dialog.getByRole("button", { name: "Analyze", exact: true }).click();
+    await expect(dialog.getByText("Analyzing locally", { exact: true })).toBeVisible();
+    await dialog.getByRole("button", { name: "Stop analysis", exact: true }).click();
+    await expect(dialog.getByText("Analysis cancelled", { exact: true })).toBeVisible();
+    await dialog.getByRole("button", { name: "Close local AI review", exact: true }).click();
+
+    await page.getByRole("button", { name: "Local AI 1", exact: true }).click();
+    dialog = page.getByRole("dialog", { name: "Review unmatched files", exact: true });
+    await dialog.getByRole("button", { name: "Analyze", exact: true }).click();
+    await expect(dialog.getByText("Review suggestions", { exact: true })).toBeVisible();
+    await expect(dialog.getByText("92%", { exact: true })).toBeVisible();
+    await expect(dialog.getByLabel("Use suggestion for project-plan.unknown", { exact: true })).toBeChecked();
+    await dialog.getByLabel("Destination for project-plan.unknown", { exact: true }).selectOption("Archive");
+    const accessibility = await new AxeBuilder({ page }).include(".ai-dialog").analyze();
+    expect(accessibility.violations).toEqual([]);
+    await dialog.getByRole("button", { name: "Add to plan", exact: true }).click();
+    await expect(page.locator(".notice")).toContainText("Local suggestions added to the plan.");
+    await expect(page.locator(".row", { hasText: "project-plan.unknown" })).toContainText("Archive");
+    const source = await page.request.get("/api/scan");
+    expect((await source.json()).suggestions.find((item: { name: string }) => item.name === "project-plan.unknown").category).toBe("Other");
+  });
+
+  test("keeps local AI review operable at mobile width", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Review unmatched files with local AI", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Review unmatched files", exact: true });
+    await expect(dialog).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    expect(await dialog.locator(".ai-footer").evaluate((footer) => footer.getBoundingClientRect().bottom <= window.innerHeight)).toBe(true);
+    const accessibility = await new AxeBuilder({ page }).include(".ai-dialog").analyze();
+    expect(accessibility.violations).toEqual([]);
+    await dialog.getByRole("button", { name: "Close local AI review", exact: true }).click();
+  });
+
+  test("inspects, organizes an AI plan, loads history, and undoes", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Local AI 1", exact: true }).click();
+    const aiDialog = page.getByRole("dialog", { name: "Review unmatched files", exact: true });
+    await aiDialog.getByRole("button", { name: "Analyze", exact: true }).click();
+    await expect(aiDialog.getByText("Review suggestions", { exact: true })).toBeVisible();
+    await expect(aiDialog.getByText("Metadata only · cached", { exact: true })).toBeVisible();
+    await aiDialog.getByRole("button", { name: "Add to plan", exact: true }).click();
+    await page.getByRole("button", { name: "Inspect project-plan.unknown", exact: true }).click();
+    let details = page.getByRole("dialog", { name: "Details", exact: true });
+    await expect(details).toContainText("Local AI");
+    await expect(details).toContainText("fixture-model:1b · Ollama · 127.0.0.1");
+    await details.getByRole("button", { name: "Close file details", exact: true }).click();
+
     await page.getByRole("button", { name: "Inspect chapter.epub", exact: true }).click();
-    const details = page.getByRole("dialog", { name: "Details", exact: true });
+    details = page.getByRole("dialog", { name: "Details", exact: true });
     await expect(details).toContainText("Custom rule “Books”");
     await details.getByRole("button", { name: "Close file details", exact: true }).click();
 
-    await page.getByRole("button", { name: "Organize 2", exact: true }).click();
-    await expect(page.locator(".notice")).toContainText("2 files organized.");
-    const undoNotes = page.getByRole("button", { name: "Undo move of notes.txt", exact: true });
-    await expect(undoNotes).toBeVisible();
-    await undoNotes.click();
+    await page.getByRole("button", { name: "Organize 3", exact: true }).click();
+    await expect(page.locator(".notice")).toContainText("3 files organized.");
+    const undoProject = page.getByRole("button", { name: "Undo move of project-plan.unknown", exact: true });
+    await expect(undoProject).toBeVisible();
+    await undoProject.click();
     await expect(page.locator(".notice")).toContainText("File returned to its original location.");
-    await expect(undoNotes).toBeDisabled();
+    await expect(undoProject).toBeDisabled();
   });
 
   test("recovers when lazy summary and panel chunks fail", async ({ page }) => {
@@ -130,5 +190,14 @@ test.describe.serial("InboxFS workspace", () => {
     await page.getByRole("button", { name: "Reload workspace", exact: true }).click();
     await page.getByRole("button", { name: "Rules 2", exact: true }).click();
     await expect(page.getByRole("dialog", { name: "Custom rules", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Close custom rules", exact: true }).click();
+
+    let aiFailed = false;
+    await page.route(/AiDialog-.*\.js$/, async (route) => {
+      if (!aiFailed) { aiFailed = true; await route.abort(); } else await route.continue();
+    });
+    await page.getByRole("button", { name: "Local AI 1", exact: true }).click();
+    await expect(page.getByRole("alert")).toContainText("Panel unavailable");
+    await page.unroute(/AiDialog-.*\.js$/);
   });
 });

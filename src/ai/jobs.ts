@@ -5,7 +5,7 @@ import type { AiClassification, AiJobSnapshot, AiProvider, AiReviewItem, AiSetti
 import { AiCache, aiCacheKey } from "./cache.js";
 
 const MAX_JOB_FILES = 100;
-const LOW_CONFIDENCE = 0.65;
+const LOW_CONFIDENCE = 0.75;
 const FILE_TIMEOUT_MS = 60_000;
 
 interface StoredJob extends AiJobSnapshot {
