@@ -22,6 +22,21 @@ describe("InboxFS core", () => {
     await Promise.all([writeFile(path.join(root, "paper.pdf"), "paper"), writeFile(path.join(root, "photo.png"), "image"), writeFile(path.join(root, ".secret"), "hidden")]);
     const scan = await scanInbox(root);
     expect(scan.suggestions.map((item) => [item.name, item.category])).toEqual([["paper.pdf", "Documents"], ["photo.png", "Images"]]);
+    expect(scan.suggestions[0].classification).toEqual({
+      type: "extension",
+      pattern: "*.pdf",
+      explanation: "The .pdf extension maps to Documents."
+    });
+  });
+
+  it("explains fallback classification for unknown and extensionless files", async () => {
+    const root = await inbox();
+    await Promise.all([writeFile(path.join(root, "artifact.xyzzy"), "unknown"), writeFile(path.join(root, "LICENSE"), "text")]);
+    const scan = await scanInbox(root);
+    expect(scan.suggestions.map((item) => item.classification)).toEqual([
+      { type: "fallback", pattern: "*.xyzzy", explanation: "No category rule matches the .xyzzy extension." },
+      { type: "fallback", pattern: "No extension", explanation: "Files without an extension use the fallback category." }
+    ]);
   });
 
   it("moves selected files and restores unchanged content", async () => {

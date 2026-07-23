@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { readdir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
-import { classify, extensionOf } from "./classifier.js";
+import { explainClassification, extensionOf } from "./classifier.js";
 import { availableDestination } from "./path-safety.js";
 import type { FileSuggestion, ScanResult } from "./model.js";
 import { hashFile } from "./file-hash.js";
@@ -43,7 +43,7 @@ export async function scanInbox(root: string): Promise<ScanResult> {
     if (!entry.isFile() || entry.isSymbolicLink() || entry.name.startsWith(".")) continue;
     const sourcePath = path.join(canonicalRoot, entry.name);
     const metadata = await stat(sourcePath);
-    const category = classify(entry.name);
+    const { category, classification } = explainClassification(entry.name);
     const candidate = path.join(canonicalRoot, category, entry.name);
     const destinationPath = availableDestination(candidate, occupied);
     occupied.add(destinationPath);
@@ -68,6 +68,7 @@ export async function scanInbox(root: string): Promise<ScanResult> {
       modifiedAt: metadata.mtime.toISOString(),
       sourcePath,
       destinationPath,
+      classification,
       selected: !duplicateOf,
       duplicateOf,
       duplicateHash

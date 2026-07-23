@@ -1,28 +1,36 @@
 import {
   ArchiveRestore,
+  ArrowUpDown,
   Check,
   Clock3,
+  ClipboardCheck,
   Copy,
   File,
+  FileSearch,
   Files,
   FolderClosed,
   FolderInput,
   HardDrive,
+  Hash,
   History,
+  Info,
   Inbox,
+  MapPin,
   Moon,
   RefreshCw,
   Search,
   ShieldCheck,
   Sun,
   Undo2,
+  X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-interface Suggestion { id: string; name: string; category: string; size: number; modifiedAt: string; destinationPath: string; selected: boolean; duplicateOf?: string }
+interface Suggestion { id: string; name: string; extension: string; category: string; size: number; modifiedAt: string; sourcePath: string; destinationPath: string; classification: { type: "extension" | "fallback"; pattern: string; explanation: string }; selected: boolean; duplicateOf?: string; duplicateHash?: string }
 interface Scan { root: string; scannedAt: string; suggestions: Suggestion[]; categoryCounts: Record<string, number>; totalSize: number }
 interface Record { id: string; createdAt: string; sourcePath: string; destinationPath: string; undoneAt?: string }
 type Theme = "light" | "dark";
+type SortOption = "name-asc" | "modified-desc" | "size-desc" | "destination-asc";
 
 const formatSize = (bytes: number) => bytes < 1024 ? `${bytes} B` : bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`;
 const basename = (value: string) => value.split(/[\\/]/).pop() ?? value;
@@ -49,16 +57,27 @@ export function App() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All files");
+  const [sort, setSort] = useState<SortOption>("name-asc");
+  const [inspectedId, setInspectedId] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const selectionOverrides = useRef<Map<string, boolean>>(new Map());
+  const inspectorRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#151719" : "#f4f5f6");
     try { localStorage.setItem("inboxfs-theme", theme); } catch { /* Theme still applies for this session. */ }
   }, [theme]);
+  useEffect(() => {
+    const inspector = inspectorRef.current;
+    if (inspectedId && inspector && !inspector.open) inspector.showModal();
+    if (!inspectedId && inspector?.open) inspector.close();
+  }, [inspectedId]);
+  useEffect(() => {
+    if (scan && inspectedId && !scan.suggestions.some((item) => item.id === inspectedId)) setInspectedId(undefined);
+  }, [scan, inspectedId]);
 
   const refresh = useCallback(async (preserveSelection = false) => {
     setBusy(true);
@@ -85,10 +104,18 @@ export function App() {
 
   const filtered = useMemo(() => (scan?.suggestions ?? []).filter((item) =>
     (category === "All files" || (category === "Duplicates" ? Boolean(item.duplicateOf) : item.category === category)) && item.name.toLowerCase().includes(query.toLowerCase())), [scan, query, category]);
+  const visible = useMemo(() => filtered.slice().sort((first, second) => {
+    if (sort === "modified-desc") return new Date(second.modifiedAt).getTime() - new Date(first.modifiedAt).getTime();
+    if (sort === "size-desc") return second.size - first.size || first.name.localeCompare(second.name);
+    if (sort === "destination-asc") return first.category.localeCompare(second.category) || first.name.localeCompare(second.name);
+    return first.name.localeCompare(second.name);
+  }), [filtered, sort]);
   const duplicateCount = scan?.suggestions.filter((item) => item.duplicateOf).length ?? 0;
   const categories = ["All files", ...(duplicateCount ? ["Duplicates"] : []), ...Object.keys(scan?.categoryCounts ?? {})];
   const selectedSize = (scan?.suggestions ?? []).filter((item) => selected.has(item.id)).reduce((total, item) => total + item.size, 0);
+  const selectedDestinations = new Set((scan?.suggestions ?? []).filter((item) => selected.has(item.id)).map((item) => parentFolder(item.destinationPath))).size;
   const allFilteredSelected = filtered.length > 0 && filtered.every((item) => selected.has(item.id));
+  const inspected = scan?.suggestions.find((item) => item.id === inspectedId);
 
   function categoryCount(item: string) {
     if (item === "All files") return scan?.suggestions.length ?? 0;
@@ -177,18 +204,25 @@ export function App() {
         </div>
         <div className="toolbar">
           <label className="search-field"><span className="sr-only">Search files</span><Search size={17} aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by file name" /></label>
+          <label className="sort-field"><span className="sr-only">Sort files</span><ArrowUpDown size={16} aria-hidden="true" /><select value={sort} onChange={(event) => setSort(event.target.value as SortOption)}><option value="name-asc">Name A-Z</option><option value="modified-desc">Newest first</option><option value="size-desc">Largest first</option><option value="destination-asc">Destination</option></select></label>
           {selected.size > 0 && <button className="clear-button" onClick={() => setFilteredSelected(false)}>Clear selection</button>}
           <button className="primary" disabled={busy || !selected.size} onClick={() => void organize()}><ArchiveRestore size={17} aria-hidden="true" /><span>Organize {selected.size || "selected"}</span></button>
+        </div>
+
+        <div className="plan-summary" aria-live="polite">
+          <ClipboardCheck size={18} aria-hidden="true" />
+          <div><strong>{selected.size ? `${selected.size} file${selected.size === 1 ? "" : "s"} in this plan` : "No files selected"}</strong><small>{selected.size ? `${formatSize(selectedSize)} across ${selectedDestinations} destination${selectedDestinations === 1 ? "" : "s"}` : "Select files to build an organization plan."}</small></div>
+          {duplicateCount > 0 && <span><Copy size={13} aria-hidden="true" />{duplicateCount} held back</span>}
         </div>
 
         {notice && <div className="notice" role="status"><Check size={16} aria-hidden="true" /><span>{notice}</span></div>}
         <div className="filelist" aria-busy={busy && !scan}>
           <div className="listhead">
             <label className="checkbox-cell"><input aria-label="Select all visible files" type="checkbox" checked={allFilteredSelected} onChange={(event) => setFilteredSelected(event.target.checked)} /></label>
-            <span>File</span><span>Destination</span><span>Size</span>
+            <span>File</span><span>Destination</span><span>Size</span><span className="sr-only">Inspect</span>
           </div>
           {!scan && Array.from({ length: 5 }, (_, index) => <div className="row skeleton-row" key={index} aria-hidden="true"><span /><span /><span /><span /></div>)}
-          {filtered.map((item) => <div className={`row${selected.has(item.id) ? " selected" : ""}`} key={item.id}>
+          {visible.map((item) => <div className={`row${selected.has(item.id) ? " selected" : ""}${inspectedId === item.id ? " inspected" : ""}`} key={item.id}>
             <label className="checkbox-cell"><input aria-label={`Select ${item.name}`} type="checkbox" checked={selected.has(item.id)} onChange={(event) => setItemSelected(item.id, event.target.checked)} /></label>
             <div className="filename"><span className="file-icon"><File size={18} aria-hidden="true" /></span><span><strong title={item.name}>{item.name}</strong><small><Clock3 size={12} aria-hidden="true" />{new Date(item.modifiedAt).toLocaleDateString()}</small></span></div>
             <div className={item.duplicateOf ? "destination duplicate" : "destination"}>
@@ -196,6 +230,7 @@ export function App() {
               {item.duplicateOf && <small title={item.duplicateOf}>{`Matches ${basename(item.duplicateOf)}`}</small>}
             </div>
             <span className="file-size">{formatSize(item.size)}</span>
+            <button className="row-action" aria-label={`Inspect ${item.name}`} title="Inspect file" onClick={() => setInspectedId(item.id)}><Info size={16} /></button>
           </div>)}
           {scan && !busy && !filtered.length && <div className="empty"><span><Inbox size={25} aria-hidden="true" /></span><strong>{query ? "No matching files" : "Inbox is clear"}</strong><p>{query ? "Try a different name or file view." : "No loose files match this view."}</p>{query && <button onClick={() => setQuery("")}>Clear search</button>}</div>}
         </div>
@@ -214,5 +249,24 @@ export function App() {
         </div>
       </section>
     </main>
+
+    <dialog className="inspector" ref={inspectorRef} aria-labelledby="inspector-title" onCancel={(event) => { event.preventDefault(); setInspectedId(undefined); }} onClose={() => setInspectedId(undefined)}>
+      {inspected && <div className="inspector-panel">
+        <header className="inspector-header"><div><span>File review</span><h2 id="inspector-title">Details</h2></div><button className="icon-button" aria-label="Close file details" title="Close" onClick={() => setInspectedId(undefined)}><X size={18} /></button></header>
+        <div className="inspector-file"><span><FileSearch size={22} aria-hidden="true" /></span><div><strong title={inspected.name}>{inspected.name}</strong><small>{inspected.category} · {formatSize(inspected.size)}</small></div></div>
+
+        <section className="inspector-section" aria-labelledby="location-heading"><h3 id="location-heading">Location</h3><dl>
+          <div><dt><MapPin size={14} aria-hidden="true" />Source</dt><dd title={inspected.sourcePath}>{inspected.sourcePath}</dd></div>
+          <div><dt><FolderClosed size={14} aria-hidden="true" />Destination</dt><dd title={inspected.destinationPath}>{inspected.destinationPath}</dd></div>
+          <div><dt><Clock3 size={14} aria-hidden="true" />Modified</dt><dd>{new Date(inspected.modifiedAt).toLocaleString()}</dd></div>
+        </dl></section>
+
+        <section className="inspector-section rule-section" aria-labelledby="rule-heading"><div className="inspector-section-title"><h3 id="rule-heading">Classification rule</h3><span className={inspected.classification.type === "fallback" ? "rule-badge fallback" : "rule-badge"}>{inspected.classification.pattern}</span></div><p>{inspected.classification.explanation}</p></section>
+
+        {inspected.duplicateOf && <section className="inspector-section duplicate-section" aria-labelledby="duplicate-heading"><h3 id="duplicate-heading">Duplicate match</h3><p title={inspected.duplicateOf}>{inspected.duplicateOf}</p>{inspected.duplicateHash && <code><Hash size={13} aria-hidden="true" />{inspected.duplicateHash}</code>}</section>}
+
+        <section className="inspector-section plan-control" aria-labelledby="plan-heading"><div><h3 id="plan-heading">Organization plan</h3><p>{selected.has(inspected.id) ? "Included in the next organization run." : inspected.duplicateOf ? "Held back because identical content already exists." : "Not included in the next organization run."}</p></div><label><span>{selected.has(inspected.id) ? "Included" : "Excluded"}</span><input type="checkbox" checked={selected.has(inspected.id)} onChange={(event) => setItemSelected(inspected.id, event.target.checked)} /></label></section>
+      </div>}
+    </dialog>
   </div>;
 }

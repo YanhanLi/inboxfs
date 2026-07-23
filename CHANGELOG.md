@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0
+
+- Add structured extension and fallback explanations to every scan suggestion.
+- Sort the file review by name, modification time, size, or destination.
+- Inspect full source and destination paths, timestamps, classification rules, and duplicate hashes in an accessible side panel.
+- Include or exclude a file directly from its inspection panel.
+- Summarize the active organization plan by file count, total size, destination count, and held-back duplicates.
+- Close stale inspectors when watched files disappear and preserve keyboard focus and Escape behavior with a native dialog.
+
 ## 0.4.0
 
 - Add complete light and dark themes with a compact header switch.

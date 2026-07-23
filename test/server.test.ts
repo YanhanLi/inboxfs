@@ -20,6 +20,7 @@ describe("local HTTP boundary", () => {
     const { app } = await fixture();
     const response = await request(app).get("/api/scan").expect(200);
     expect(response.body.suggestions).toHaveLength(1);
+    expect(response.body.suggestions[0].classification.pattern).toBe("*.txt");
   });
 
   it("rejects a non-loopback Host header", async () => {

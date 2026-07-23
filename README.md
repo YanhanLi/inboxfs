@@ -30,6 +30,9 @@ npx github:YanhanLi/inboxfs ~/Desktop
 - categorizes documents, images, audio, video, archives, installers, code/data, fonts, and other files;
 - scans only loose regular files in the selected root, leaving subfolders and hidden files alone;
 - previews every destination before making changes;
+- explains the extension or fallback rule behind every suggested destination;
+- sorts suggestions by name, modification time, size, or destination and exposes full details in a keyboard-friendly inspector;
+- summarizes each organization plan before files move;
 - avoids overwriting existing names by adding a numeric suffix;
 - detects byte-identical files in the inbox and existing category folders, leaving later copies unselected;
 - refreshes the inbox automatically when loose files are added, renamed, or removed;

@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { Category } from "./model.js";
+import type { Category, ClassificationMatch } from "./model.js";
 
 const GROUPS: Array<[Category, Set<string>]> = [
   ["Documents", new Set(["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "md", "rtf", "epub"])],
@@ -17,9 +17,29 @@ export function extensionOf(filename: string): string {
 }
 
 export function classify(filename: string): Category {
+  return explainClassification(filename).category;
+}
+
+export function explainClassification(filename: string): { category: Category; classification: ClassificationMatch } {
   const extension = extensionOf(filename);
   for (const [category, extensions] of GROUPS) {
-    if (extensions.has(extension)) return category;
+    if (extensions.has(extension)) {
+      return {
+        category,
+        classification: {
+          type: "extension",
+          pattern: `*.${extension}`,
+          explanation: `The .${extension} extension maps to ${category}.`
+        }
+      };
+    }
   }
-  return "Other";
+  return {
+    category: "Other",
+    classification: {
+      type: "fallback",
+      pattern: extension ? `*.${extension}` : "No extension",
+      explanation: extension ? `No category rule matches the .${extension} extension.` : "Files without an extension use the fallback category."
+    }
+  };
 }

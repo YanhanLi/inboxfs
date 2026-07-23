@@ -9,6 +9,12 @@ export type Category =
   | "Fonts"
   | "Other";
 
+export interface ClassificationMatch {
+  type: "extension" | "fallback";
+  pattern: string;
+  explanation: string;
+}
+
 export interface FileSuggestion {
   id: string;
   name: string;
@@ -18,6 +24,7 @@ export interface FileSuggestion {
   modifiedAt: string;
   sourcePath: string;
   destinationPath: string;
+  classification: ClassificationMatch;
   selected: boolean;
   duplicateOf?: string;
   duplicateHash?: string;
