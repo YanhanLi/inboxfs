@@ -65,7 +65,11 @@ export class AiJobManager {
   cancel(id: string): AiJobSnapshot {
     const job = this.jobs.get(id);
     if (!job) throw new Error("AI review job was not found.");
-    if (job.status === "queued" || job.status === "running") job.controller.abort();
+    if (job.status === "queued" || job.status === "running") {
+      job.status = "cancelled";
+      job.completedAt = new Date().toISOString();
+      job.controller.abort();
+    }
     return snapshot(job);
   }
 
@@ -93,6 +97,7 @@ export class AiJobManager {
         let result: AiReviewItem;
         try {
           const context = await extractFileContext(this.root, item, settings.includeText);
+          if (job.controller.signal.aborted) break;
           const signal = AbortSignal.any([job.controller.signal, AbortSignal.timeout(FILE_TIMEOUT_MS)]);
           const classification = validateClassification(await this.provider.classify(context, settings.destinations, settings.model, signal), settings.destinations);
           result = {

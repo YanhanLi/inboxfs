@@ -9,13 +9,14 @@ const MAX_TEXT_BYTES = 32 * 1024;
 
 export async function extractFileContext(root: string, item: FileSuggestion, includeText: boolean): Promise<AiFileContext> {
   const canonicalRoot = await realpath(root);
-  assertInsideRoot(canonicalRoot, item.sourcePath);
   const metadata = await lstat(item.sourcePath);
   if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size !== item.size || metadata.mtime.toISOString() !== item.modifiedAt) throw new Error("The file changed since the inbox preview.");
+  const canonicalSource = await realpath(item.sourcePath);
+  assertInsideRoot(canonicalRoot, canonicalSource);
   const context: AiFileContext = { name: item.name, extension: item.extension, size: item.size, modifiedAt: item.modifiedAt, textBytes: 0 };
   if (!includeText || !TEXT_EXTENSIONS.has(item.extension)) return context;
 
-  const handle = await open(item.sourcePath, "r");
+  const handle = await open(canonicalSource, "r");
   try {
     const buffer = Buffer.alloc(Math.min(MAX_TEXT_BYTES, metadata.size));
     const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
