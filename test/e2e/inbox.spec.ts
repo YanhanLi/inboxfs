@@ -7,7 +7,7 @@ test.describe.serial("InboxFS workspace", () => {
     await expect(page.getByText("Watching", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Rules 1", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Reading 1", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Local AI 1", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Local AI", exact: true })).toBeVisible();
 
     const accessibility = await new AxeBuilder({ page }).analyze();
     expect(accessibility.violations).toEqual([]);
@@ -95,7 +95,7 @@ test.describe.serial("InboxFS workspace", () => {
 
   test("configures, cancels, reviews, and applies local AI suggestions without moving files", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("button", { name: "Local AI 1", exact: true }).click();
+    await page.getByRole("button", { name: "Local AI", exact: true }).click();
     let dialog = page.getByRole("dialog", { name: "Review unmatched files", exact: true });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByText("1 local model ready", { exact: true })).toBeVisible();
@@ -110,7 +110,7 @@ test.describe.serial("InboxFS workspace", () => {
     await expect(dialog.getByText("Analysis cancelled", { exact: true })).toBeVisible();
     await dialog.getByRole("button", { name: "Close local AI review", exact: true }).click();
 
-    await page.getByRole("button", { name: "Local AI 1", exact: true }).click();
+    await page.getByRole("button", { name: "Local AI", exact: true }).click();
     dialog = page.getByRole("dialog", { name: "Review unmatched files", exact: true });
     await dialog.getByRole("button", { name: "Analyze", exact: true }).click();
     await expect(dialog.getByText("Review suggestions", { exact: true })).toBeVisible();
@@ -141,7 +141,7 @@ test.describe.serial("InboxFS workspace", () => {
 
   test("inspects, organizes an AI plan, loads history, and undoes", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("button", { name: "Local AI 1", exact: true }).click();
+    await page.getByRole("button", { name: "Local AI", exact: true }).click();
     const aiDialog = page.getByRole("dialog", { name: "Review unmatched files", exact: true });
     await aiDialog.getByRole("button", { name: "Analyze", exact: true }).click();
     await expect(aiDialog.getByText("Review suggestions", { exact: true })).toBeVisible();
@@ -155,7 +155,7 @@ test.describe.serial("InboxFS workspace", () => {
     page.once("dialog", (confirmation) => confirmation.accept());
     await rulesDialog.getByRole("button", { name: "Close custom rules", exact: true }).click();
 
-    await page.getByRole("button", { name: "Local AI 1", exact: true }).click();
+    await page.getByRole("button", { name: "Local AI", exact: true }).click();
     const planDialog = page.getByRole("dialog", { name: "Review unmatched files", exact: true });
     await planDialog.getByRole("button", { name: "Analyze", exact: true }).click();
     await expect(planDialog.getByText("Metadata only · cached", { exact: true })).toBeVisible();
@@ -210,11 +210,11 @@ test.describe.serial("InboxFS workspace", () => {
     await page.route(/AiDialog-.*\.js$/, async (route) => {
       if (!aiFailed) { aiFailed = true; await route.abort(); } else await route.continue();
     });
-    await page.getByRole("button", { name: "Local AI 1", exact: true }).click();
+    await page.getByRole("button", { name: "Local AI", exact: true }).click();
     await expect(page.getByRole("alert")).toContainText("Panel unavailable");
     await page.unroute(/AiDialog-.*\.js$/);
     await page.getByRole("button", { name: "Reload workspace", exact: true }).click();
-    await page.getByRole("button", { name: "Local AI 1", exact: true }).click();
+    await page.getByRole("button", { name: "Local AI", exact: true }).click();
     await expect(page.getByRole("dialog", { name: "Review unmatched files", exact: true })).toBeVisible();
   });
 });

@@ -6,7 +6,7 @@ import type { AiDecision, AiJob, AiPlanItem, AiReviewItem, AiSettings, AiStatus,
 interface AiDialogProps {
   scan: Scan;
   onClose: () => void;
-  onApplied: (jobId: string, decisions: AiDecision[], plan: AiPlanItem[], results: AiReviewItem[]) => Promise<void>;
+  onApplied: (scan: Scan, jobId: string, decisions: AiDecision[]) => void;
   onCreateRule: (rule: RuleDocument) => void;
 }
 
@@ -88,7 +88,8 @@ export default function AiDialog({ scan, onClose, onApplied, onCreateRule }: AiD
     setApplying(true); setError("");
     try {
       const response = await json<{ items: AiPlanItem[] }>("/api/ai/plan", { method: "POST", body: JSON.stringify({ jobId: job.id, decisions }) });
-      await onApplied(job.id, decisions, response.items, job.results);
+      const { mergeAiPlan } = await import("./ai-plan");
+      onApplied(mergeAiPlan(scan, response.items, job.results), job.id, decisions);
       onClose();
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to apply reviewed suggestions"); }
     finally { setApplying(false); }
