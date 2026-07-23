@@ -22,10 +22,12 @@ try {
   await page.getByRole("button", { name: "Close custom rules" }).click();
   const aiButton = page.getByRole("button", { name: /^Local AI/ });
   await aiButton.click();
-  const aiDialog = page.getByRole("dialog", { name: "Review unmatched files" });
+  const aiDialog = page.getByRole("dialog");
   await aiDialog.getByLabel("Enabled", { exact: true }).check();
   await aiDialog.getByLabel("Allowed destinations", { exact: true }).fill("Projects, Archive");
+  await aiDialog.getByLabel("Read supported text locally", { exact: false }).check();
   await aiDialog.getByRole("button", { name: "Save configuration" }).click();
+  await aiDialog.getByRole("button", { name: "Selected", exact: true }).click();
   await aiDialog.getByRole("button", { name: "Analyze", exact: true }).click();
   await aiDialog.getByText("Review suggestions", { exact: true }).waitFor();
   await page.waitForTimeout(300);
@@ -42,7 +44,8 @@ try {
   await page.getByRole("button", { name: "Close custom rules" }).click();
 
   await aiButton.click();
-  const darkAiDialog = page.getByRole("dialog", { name: "Review unmatched files" });
+  const darkAiDialog = page.getByRole("dialog");
+  await darkAiDialog.getByRole("button", { name: "Selected", exact: true }).click();
   await darkAiDialog.getByRole("button", { name: "Analyze", exact: true }).click();
   await darkAiDialog.getByText("Review suggestions", { exact: true }).waitFor();
   await page.waitForTimeout(300);

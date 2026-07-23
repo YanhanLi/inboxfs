@@ -330,6 +330,9 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--primary)
 .ai-text-setting strong { font-size: 11px; }
 .ai-text-setting small { color: var(--text-muted); font-size: 10px; line-height: 1.35; }
 .ai-save-settings { grid-column: 1 / -1; justify-self: end; display: flex; align-items: center; gap: 7px; }
+.ai-scope { width: fit-content; margin: 0 0 10px auto; padding: 3px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-muted); display: grid; grid-template-columns: 1fr 1fr; }
+.ai-scope button { min-width: 92px; min-height: 32px; padding: 0 12px; border: 0; border-radius: 3px; background: transparent; color: var(--text-muted); font-size: 10px; font-weight: 700; }
+.ai-scope button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px #0002; }
 .ai-start { min-height: 78px; padding: 18px 0; border-block: 1px solid var(--border); display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center; gap: 10px; }
 .ai-start > span { width: 34px; height: 34px; border-radius: var(--radius); background: var(--blue-soft); color: var(--blue); display: grid; place-items: center; }
 .ai-start .primary { min-width: 112px; }

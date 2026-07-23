@@ -1,6 +1,6 @@
 {
   "name": "inboxfs",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "A local-first inbox for organizing files with safe previews and undo.",
   "type": "module",
   "bin": {
@@ -24,10 +24,11 @@
     "test:e2e": "playwright test",
     "benchmark:rules": "node scripts/benchmark-rules.mjs",
     "benchmark:ai": "node scripts/benchmark-ai.mjs",
+    "benchmark:documents": "node scripts/benchmark-documents.mjs",
     "evaluate:ai": "node scripts/evaluate-ai.mjs",
     "screenshots": "node scripts/capture-screenshots.mjs",
     "check:bundle": "node scripts/check-bundle-budget.mjs",
-    "check": "npm run build && npm test && npm run benchmark:rules && npm run benchmark:ai && npm run check:bundle && npm run test:e2e",
+    "check": "npm run build && npm test && npm run benchmark:rules && npm run benchmark:ai && npm run benchmark:documents && npm run check:bundle && npm run test:e2e",
     "prepare": "npm run build"
   },
   "engines": {
@@ -51,7 +52,10 @@
     "express": "^5.1.0",
     "open": "^10.2.0",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "saxes": "^6.0.0",
+    "unpdf": "^1.6.2",
+    "yauzl": "^3.4.0"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
@@ -61,6 +65,8 @@
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
     "@types/supertest": "^7.2.1",
+    "@types/yauzl": "^3.4.0",
+    "@types/yazl": "^3.3.1",
     "@vitejs/plugin-react": "^4.7.0",
     "jsdom": "^26.1.0",
     "lucide-react": "^0.468.0",
@@ -68,6 +74,7 @@
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "vite": "^7.1.5",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "yazl": "^3.3.1"
   }
 }

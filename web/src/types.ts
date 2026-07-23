@@ -15,6 +15,7 @@ export interface Suggestion {
     source?: string;
     confidence?: number;
     textBytes?: number;
+    textSource?: "plain-text" | "pdf" | "docx";
     cached?: boolean;
   };
   selected: boolean;
@@ -92,6 +93,7 @@ export interface AiReviewItem {
   explanation?: string;
   model: string;
   textBytes: number;
+  textSource?: "plain-text" | "pdf" | "docx";
   cached?: boolean;
   status: "suggested" | "needs-review" | "failed";
   error?: string;
@@ -103,6 +105,7 @@ export interface AiJob {
   createdAt: string;
   completedAt?: string;
   model: string;
+  scope: "unmatched" | "selected";
   total: number;
   processed: number;
   results: AiReviewItem[];

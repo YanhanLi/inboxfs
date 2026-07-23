@@ -18,6 +18,7 @@ export interface AiFileContext {
   modifiedAt: string;
   text?: string;
   textBytes: number;
+  textSource?: "plain-text" | "pdf" | "docx";
 }
 
 export interface AiClassification {
@@ -40,6 +41,7 @@ export interface AiReviewItem {
   explanation?: string;
   model: string;
   textBytes: number;
+  textSource?: "plain-text" | "pdf" | "docx";
   cached?: boolean;
   status: "suggested" | "needs-review" | "failed";
   error?: string;
@@ -51,6 +53,7 @@ export interface AiJobSnapshot {
   createdAt: string;
   completedAt?: string;
   model: string;
+  scope: "unmatched" | "selected";
   total: number;
   processed: number;
   results: AiReviewItem[];

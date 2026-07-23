@@ -127,6 +127,24 @@ test.describe.serial("InboxFS workspace", () => {
     expect((await source.json()).suggestions.find((item: { name: string }) => item.name === "project-plan.unknown").category).toBe("Other");
   });
 
+  test("reviews explicitly selected deterministic files with local text provenance", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Local AI", exact: true }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: "Selected", exact: true }).click();
+    await expect(dialog).toHaveAccessibleName("Review selected files");
+    await expect(dialog.getByRole("button", { name: "Selected", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(dialog.getByRole("heading", { name: "3 selected files", exact: true })).toBeVisible();
+    await dialog.getByRole("button", { name: "Analyze", exact: true }).click();
+    await expect(dialog.getByText("Review suggestions", { exact: true })).toBeVisible();
+    const notes = dialog.locator(".ai-result", { hasText: "notes.txt" });
+    await expect(notes).toContainText("5 B text extracted locally");
+    await expect(notes.getByLabel("Use suggestion for notes.txt", { exact: true })).toBeChecked();
+    await dialog.getByRole("button", { name: "Close local AI review", exact: true }).click();
+    const source = await page.request.get("/api/scan");
+    expect((await source.json()).suggestions.find((item: { name: string }) => item.name === "notes.txt").classification.type).toBe("extension");
+  });
+
   test("keeps local AI review operable at mobile width", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");

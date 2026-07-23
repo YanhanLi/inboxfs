@@ -4,6 +4,6 @@ InboxFS moves user files, so data-loss and path-boundary bugs are security issue
 
 Please do not open a public issue for a vulnerability. Use GitHub's private vulnerability reporting for this repository. Include the affected version, operating system, reproduction steps, and whether files were moved, overwritten, or exposed.
 
-The current supported line is `0.10.x`. Until InboxFS reaches 1.0, use it only on folders that are already backed up.
+The current supported line is `0.11.x`. Until InboxFS reaches 1.0, use it only on folders that are already backed up.
 
-Local AI review is disabled by default and connects only to Ollama on `127.0.0.1:11434`. Reports involving model selection, prompt injection, unexpected network access, symbolic-link changes during reads, or unreviewed AI decisions are in scope. Include whether text access was enabled and the Ollama model name in your report; do not attach private file contents.
+Local AI review is disabled by default and connects only to Ollama on `127.0.0.1:11434`. Reports involving model selection, prompt injection, unexpected network access, symbolic-link or file changes during reads, malformed PDF/DOCX handling, parser resource exhaustion, or unreviewed AI decisions are in scope. Include whether text access was enabled and the Ollama model name in your report; do not attach private file contents.

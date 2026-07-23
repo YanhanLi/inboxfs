@@ -34,17 +34,26 @@ export class AiJobManager {
 
   constructor(private readonly root: string, private readonly provider: AiProvider, private readonly cache?: AiCache) {}
 
-  async start(scan: ScanResult, settings: AiSettings): Promise<AiJobSnapshot> {
+  async start(scan: ScanResult, settings: AiSettings, requestedIds?: string[]): Promise<AiJobSnapshot> {
     if (!settings.enabled) throw new Error("Enable local AI review before starting an analysis.");
     const models = await this.provider.listModels(AbortSignal.timeout(5_000));
     if (!models.some((model) => model.name === settings.model)) throw new Error("The selected model is not installed locally.");
-    const candidates = scan.suggestions.filter((item) => item.classification.type === "fallback").slice(0, MAX_JOB_FILES);
-    if (!candidates.length) throw new Error("No unmatched files are available for local AI review.");
+    let candidates: ScanResult["suggestions"];
+    if (requestedIds) {
+      if (!requestedIds.length || requestedIds.length > MAX_JOB_FILES || new Set(requestedIds).size !== requestedIds.length) throw new Error("Selected AI review requires 1 to 100 unique file IDs.");
+      const selected = new Set(requestedIds);
+      candidates = scan.suggestions.filter((item) => selected.has(item.id));
+      if (candidates.length !== selected.size) throw new Error("One or more selected files changed before local AI review.");
+    } else {
+      candidates = scan.suggestions.filter((item) => item.classification.type === "fallback").slice(0, MAX_JOB_FILES);
+      if (!candidates.length) throw new Error("No unmatched files are available for local AI review.");
+    }
     const job: StoredJob = {
       id: randomUUID(),
       status: "queued",
       createdAt: new Date().toISOString(),
       model: settings.model,
+      scope: requestedIds ? "selected" : "unmatched",
       total: candidates.length,
       processed: 0,
       results: [],
@@ -100,12 +109,12 @@ export class AiJobManager {
         if (job.controller.signal.aborted) break;
         let result: AiReviewItem;
         try {
-          const context = await extractFileContext(this.root, item, settings.includeText);
+          const signal = AbortSignal.any([job.controller.signal, AbortSignal.timeout(FILE_TIMEOUT_MS)]);
+          const context = await extractFileContext(this.root, item, settings.includeText, signal);
           if (job.controller.signal.aborted) break;
           const key = aiCacheKey(this.root, settings.model, settings.destinations, context);
           const cachedInput = await this.cache?.get(key);
           const cached = cachedInput ? validateClassification(cachedInput, settings.destinations) : undefined;
-          const signal = AbortSignal.any([job.controller.signal, AbortSignal.timeout(FILE_TIMEOUT_MS)]);
           const classification = cached ?? validateClassification(await this.provider.classify(context, settings.destinations, settings.model, signal), settings.destinations);
           if (!cached) await this.cache?.set(key, classification);
           result = {
@@ -117,6 +126,7 @@ export class AiJobManager {
             explanation: classification.explanation,
             model: settings.model,
             textBytes: context.textBytes,
+            textSource: context.textSource,
             cached: Boolean(cached),
             status: classification.confidence < LOW_CONFIDENCE ? "needs-review" : "suggested",
           };

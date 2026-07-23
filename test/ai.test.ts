@@ -195,6 +195,8 @@ describe("local AI safety boundary", () => {
     await writeFile(path.join(root, "mystery.unknown"), "mystery");
     const app = createApp(root, undefined, { aiProvider: provider(), aiSettingsPath: settingsPath });
     await request(app).put("/api/ai/settings").send({ enabled: true, model: "local-model:1b", includeText: false, destinations: ["Projects", "Archive"] }).expect(200);
+    await request(app).post("/api/ai/jobs").send({ ids: "not-an-array" }).expect(409);
+    await request(app).post("/api/ai/jobs").send({ ids: [] }).expect(409);
     await request(app).post("/api/ai/jobs").set("Origin", "https://malicious.example").expect(403);
     const job = await completedJob(app);
     const id = job.results[0].suggestionId;

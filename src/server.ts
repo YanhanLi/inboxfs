@@ -104,8 +104,12 @@ export function createApp(root: string, webRoot?: string, options: AppOptions = 
       response.json(await mutationLock.run(() => writeAiSettings(proposed, aiSettingsPath)));
     } catch (error) { next(error); }
   });
-  app.post("/api/ai/jobs", async (_request, response, next) => {
-    try { response.status(202).json(await aiJobs.start(await scanInbox(root), await readAiSettings(aiSettingsPath))); } catch (error) { next(error); }
+  app.post("/api/ai/jobs", async (request, response, next) => {
+    try {
+      const ids = request.body?.ids;
+      if (ids !== undefined && (!Array.isArray(ids) || ids.some((id: unknown) => typeof id !== "string"))) throw new Error("Selected AI review IDs must be an array of strings.");
+      response.status(202).json(await aiJobs.start(await scanInbox(root), await readAiSettings(aiSettingsPath), ids));
+    } catch (error) { next(error); }
   });
   app.post("/api/ai/plan", async (request, response, next) => {
     try {

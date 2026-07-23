@@ -21,6 +21,7 @@ export function mergeAiPlan(scan: Scan, plan: AiPlanItem[], results: AiReviewIte
       source: "Ollama · 127.0.0.1",
       confidence: review.confidence,
       textBytes: review.textBytes,
+      textSource: review.textSource,
       cached: review.cached,
     } };
   });

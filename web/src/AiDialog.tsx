@@ -5,6 +5,7 @@ import type { AiDecision, AiJob, AiPlanItem, AiReviewItem, AiSettings, AiStatus,
 
 interface AiDialogProps {
   scan: Scan;
+  selected: Set<string>;
   onClose: () => void;
   onApplied: (scan: Scan, jobId: string, decisions: AiDecision[]) => void;
   onCreateRule: (rule: RuleDocument) => void;
@@ -15,7 +16,7 @@ const formatSize = (bytes: number) => bytes < 1024 ? `${bytes} B` : bytes < 1024
 const destinationText = (settings?: AiSettings) => settings?.destinations.join(", ") ?? "";
 const parseDestinations = (value: string) => value.split(",").map((item) => item.trim()).filter(Boolean);
 
-export default function AiDialog({ scan, onClose, onApplied, onCreateRule }: AiDialogProps) {
+export default function AiDialog({ scan, selected, onClose, onApplied, onCreateRule }: AiDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const initializedJob = useRef("");
   const [status, setStatus] = useState<AiStatus>();
@@ -27,7 +28,11 @@ export default function AiDialog({ scan, onClose, onApplied, onCreateRule }: AiD
   const [saving, setSaving] = useState(false);
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState("");
+  const [scope, setScope] = useState<"unmatched" | "selected">("unmatched");
   const unmatched = useMemo(() => scan.suggestions.filter((item) => item.classification.type === "fallback"), [scan]);
+  const targets = scope === "selected" ? scan.suggestions.filter((item) => selected.has(item.id)) : unmatched;
+  const reviewScope = job?.scope ?? scope;
+  const reviewTitle = reviewScope === "selected" ? "Review selected files" : "Review unmatched files";
   const settingsDirty = Boolean(status && draft && (JSON.stringify(status.settings) !== JSON.stringify({ ...draft, destinations: parseDestinations(destinations) })));
 
   useEffect(() => { dialogRef.current?.showModal(); void loadStatus(); }, []);
@@ -71,7 +76,7 @@ export default function AiDialog({ scan, onClose, onApplied, onCreateRule }: AiD
 
   async function start() {
     setError(""); setChoices({}); initializedJob.current = "";
-    try { setJob(await json<AiJob>("/api/ai/jobs", { method: "POST", body: "{}" })); }
+    try { setJob(await json<AiJob>("/api/ai/jobs", { method: "POST", body: JSON.stringify(scope === "selected" ? { ids: targets.map((item) => item.id) } : {}) })); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to start local analysis"); }
   }
 
@@ -104,7 +109,7 @@ export default function AiDialog({ scan, onClose, onApplied, onCreateRule }: AiD
   const acceptedCount = Object.values(choices).filter((choice) => choice.accepted).length;
   return <dialog className="ai-dialog" ref={dialogRef} aria-labelledby="ai-title" onCancel={(event) => { event.preventDefault(); if (!running) onClose(); }} onClose={onClose}>
     <div className="ai-panel">
-      <header className="ai-header"><div><span>Local intelligence</span><h2 id="ai-title">Review unmatched files</h2></div><button className="icon-button" aria-label="Close local AI review" title="Close" disabled={running} onClick={onClose}><X size={18} /></button></header>
+      <header className="ai-header"><div><span>Local intelligence</span><h2 id="ai-title">{reviewTitle}</h2></div><button className="icon-button" aria-label="Close local AI review" title="Close" disabled={running} onClick={onClose}><X size={18} /></button></header>
       <div className="ai-body" aria-busy={loading || saving || applying}>
         {loading && <div className="ai-loading"><RefreshCw className="spin" size={19} aria-hidden="true" />Checking local model service</div>}
         {error && <div className="ai-error" role="alert"><AlertTriangle size={16} aria-hidden="true" /><span>{error}</span></div>}
@@ -113,13 +118,13 @@ export default function AiDialog({ scan, onClose, onApplied, onCreateRule }: AiD
             <span><Bot size={18} aria-hidden="true" /></span><div><strong>{status.available ? `${status.models.length} local model${status.models.length === 1 ? "" : "s"} ready` : "Ollama is not available"}</strong><small>{status.available ? "Connected on 127.0.0.1. Files never use a remote endpoint." : status.error}</small></div><button className="icon-button" aria-label="Check local model service again" title="Retry" onClick={() => void loadStatus()}><RefreshCw size={15} /></button>
           </section>
           <section className="ai-settings" aria-labelledby="ai-settings-heading">
-            <div className="ai-section-heading"><div><h3 id="ai-settings-heading">Configuration</h3><p>Only files left in Other are analyzed.</p></div><label className="ai-enabled"><input type="checkbox" checked={draft.enabled} disabled={!status.available || running} onChange={(event) => setDraft({ ...draft, enabled: event.target.checked })} /><span>Enabled</span></label></div>
+            <div className="ai-section-heading"><div><h3 id="ai-settings-heading">Configuration</h3><p>Deterministic rules always run before local review.</p></div><label className="ai-enabled"><input type="checkbox" checked={draft.enabled} disabled={!status.available || running} onChange={(event) => setDraft({ ...draft, enabled: event.target.checked })} /><span>Enabled</span></label></div>
             <label><span>Local model</span><select value={draft.model} disabled={!status.available || running} onChange={(event) => setDraft({ ...draft, model: event.target.value })}><option value="">Select a model</option>{status.models.map((model) => <option value={model.name} key={model.digest}>{model.name} · {formatSize(model.size)}</option>)}</select></label>
             <label className="ai-destinations"><span>Allowed destinations</span><input value={destinations} disabled={running} onChange={(event) => setDestinations(event.target.value)} placeholder="Projects, Archive" /></label>
-            <label className="ai-text-setting"><input type="checkbox" checked={draft.includeText} disabled={running} onChange={(event) => setDraft({ ...draft, includeText: event.target.checked })} /><span><strong>Read supported text locally</strong><small>Up to 32 KB per plain-text file. Extracted text is never cached.</small></span></label>
+            <label className="ai-text-setting"><input type="checkbox" checked={draft.includeText} disabled={running} onChange={(event) => setDraft({ ...draft, includeText: event.target.checked })} /><span><strong>Read supported text locally</strong><small>Up to 32 KB from plain text, PDF, or DOCX. Extracted text is never cached.</small></span></label>
             {settingsDirty && <button className="secondary-button ai-save-settings" disabled={saving || running || (draft.enabled && !status.available)} onClick={() => void saveSettings()}><Save size={15} aria-hidden="true" />{saving ? "Saving" : "Save configuration"}</button>}
           </section>
-          {!job && <section className="ai-start" aria-labelledby="ai-start-heading"><span><Database size={20} aria-hidden="true" /></span><div><h3 id="ai-start-heading">{unmatched.length} unmatched file{unmatched.length === 1 ? "" : "s"}</h3><p>Rules and built-in categories have already run.</p></div><button className="primary" disabled={!draft.enabled || settingsDirty || !unmatched.length || !status.available} onClick={() => void start()}><Play size={16} aria-hidden="true" />Analyze</button></section>}
+          {!job && <><div className="ai-scope" role="group" aria-label="Files to review"><button aria-pressed={scope === "unmatched"} onClick={() => setScope("unmatched")}>Unmatched</button><button aria-pressed={scope === "selected"} onClick={() => setScope("selected")}>Selected</button></div><section className="ai-start" aria-labelledby="ai-start-heading"><span><Database size={20} aria-hidden="true" /></span><div><h3 id="ai-start-heading">{targets.length} {scope} file{targets.length === 1 ? "" : "s"}</h3><p>{scope === "selected" ? "Review the files selected in the workspace." : "Rules and built-in categories have already run."}</p></div><button className="primary" disabled={!draft.enabled || settingsDirty || !targets.length || !status.available} onClick={() => void start()}><Play size={16} aria-hidden="true" />Analyze</button></section></>}
           {job && <section className="ai-job" aria-labelledby="ai-job-heading">
             <div className="ai-job-heading"><div><h3 id="ai-job-heading">{job.status === "completed" ? "Review suggestions" : job.status === "cancelled" ? "Analysis cancelled" : job.status === "failed" ? "Analysis failed" : "Analyzing locally"}</h3><p>{job.processed} of {job.total} files · {job.model}</p></div>{running && <button className="secondary-button" onClick={() => void cancel()}><Square size={14} aria-hidden="true" />Stop analysis</button>}</div>
             <div className="ai-progress" role="progressbar" aria-label="Local files analyzed" aria-valuemin={0} aria-valuemax={job.total} aria-valuenow={job.processed}><span style={{ width: `${job.total ? job.processed / job.total * 100 : 0}%` }} /></div>
@@ -127,7 +132,7 @@ export default function AiDialog({ scan, onClose, onApplied, onCreateRule }: AiD
             {job.results.length > 0 && <div className="ai-results">{job.results.map((item) => {
               const choice = choices[item.suggestionId];
               return <article className={`ai-result ${item.status}`} key={item.suggestionId}>
-                <label className="ai-result-select"><input type="checkbox" aria-label={`Use suggestion for ${item.name}`} disabled={!item.destination || job.status !== "completed"} checked={choice?.accepted ?? false} onChange={(event) => setChoices({ ...choices, [item.suggestionId]: { accepted: event.target.checked, destination: choice?.destination ?? item.destination ?? "" } })} /><span><strong title={item.name}>{item.name}</strong><small>{item.textBytes ? <><FileText size={12} aria-hidden="true" />{formatSize(item.textBytes)} read locally</> : "Metadata only"}{item.cached ? " · cached" : ""}</small></span></label>
+                <label className="ai-result-select"><input type="checkbox" aria-label={`Use suggestion for ${item.name}`} disabled={!item.destination || job.status !== "completed"} checked={choice?.accepted ?? false} onChange={(event) => setChoices({ ...choices, [item.suggestionId]: { accepted: event.target.checked, destination: choice?.destination ?? item.destination ?? "" } })} /><span><strong title={item.name}>{item.name}</strong><small>{item.textBytes ? <><FileText size={12} aria-hidden="true" />{formatSize(item.textBytes)} {item.textSource === "pdf" ? "PDF" : item.textSource === "docx" ? "DOCX" : "text"} extracted locally</> : "Metadata only"}{item.cached ? " · cached" : ""}</small></span></label>
                 {item.destination ? <><div className="ai-result-route"><select aria-label={`Destination for ${item.name}`} value={choice?.destination ?? item.destination} disabled={job.status !== "completed"} onChange={(event) => setChoices({ ...choices, [item.suggestionId]: { accepted: choice?.accepted ?? false, destination: event.target.value } })}>{draft.destinations.map((destination) => <option key={destination}>{destination}</option>)}</select><b>{Math.round((item.confidence ?? 0) * 100)}%</b></div><p>{item.explanation}</p><div className="ai-result-actions"><span className={item.status}>{item.status === "suggested" ? <Check size={13} /> : <AlertTriangle size={13} />}{item.status === "suggested" ? "Suggested" : "Review required"}</span><button onClick={() => createRule(item)}><SlidersHorizontal size={13} />Create rule</button></div></> : <p className="ai-result-failure">{item.error}</p>}
               </article>;
             })}</div>}

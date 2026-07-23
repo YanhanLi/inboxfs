@@ -4,7 +4,7 @@ import path from "node:path";
 import type { AiClassification, AiFileContext } from "./types.js";
 
 const CACHE_VERSION = 1;
-const PROMPT_VERSION = 1;
+const PROMPT_VERSION = 2;
 const MAX_ENTRIES = 500;
 const MAX_CACHE_BYTES = 512 * 1024;
 
@@ -19,7 +19,7 @@ export function aiCacheKey(root: string, model: string, destinations: string[], 
     root: createHash("sha256").update(root).digest("hex"),
     model,
     destinations,
-    file: { name: context.name, extension: context.extension, size: context.size, modifiedAt: context.modifiedAt, text: context.text },
+    file: { name: context.name, extension: context.extension, size: context.size, modifiedAt: context.modifiedAt, text: context.text, textSource: context.textSource },
   })).digest("hex");
 }
 

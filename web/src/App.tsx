@@ -247,6 +247,6 @@ export function App() {
     {inspected && <Suspense fallback={asyncFallback}><Inspector item={inspected} included={selected.has(inspected.id)} onClose={() => setInspectedId(undefined)} onSelected={(value) => setItemSelected(inspected.id, value)} /></Suspense>}
 
     {rulesOpen && <Suspense fallback={asyncFallback}><RulesDialog initialRule={rulesOpen === true ? undefined : rulesOpen} onClose={() => setRulesOpen(false)} onSaved={rulesSaved} /></Suspense>}
-    {aiOpen && scan && <Suspense fallback={asyncFallback}><AiDialog scan={scan} onClose={() => setAiOpen(false)} onApplied={applyAiPlan} onCreateRule={createRuleFromAi} /></Suspense>}
+    {aiOpen && scan && <Suspense fallback={asyncFallback}><AiDialog scan={scan} selected={selected} onClose={() => setAiOpen(false)} onApplied={applyAiPlan} onCreateRule={createRuleFromAi} /></Suspense>}
   </div>;
 }

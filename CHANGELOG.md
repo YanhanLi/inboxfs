@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.0
+
+- Let users explicitly review 1 to 100 currently selected files while keeping unmatched-only review as the default and deterministic rules first.
+- Add bounded local text extraction for PDF and DOCX alongside the existing plain-text allowlist, with source, page, XML, ZIP-entry, output, and cancellation limits.
+- Open and verify each canonical source once so path swaps, symbolic links, and changed files degrade safely to metadata-only review.
+- Preserve text-source provenance through model prompts, cache keys, reviewed plan items, and the file inspector without storing extracted content.
+- Add malicious-document, stale-selection, transaction, browser, and performance coverage, bringing the suite to 48 unit/HTTP checks and nine desktop/mobile workflows.
+
 ## 0.10.0
 
 - Add an optional, disabled-by-default local AI review for files that reach the deterministic fallback classification.

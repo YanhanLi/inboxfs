@@ -44,7 +44,7 @@ npx github:YanhanLi/inboxfs ~/Desktop
 - provides keyboard-friendly filters, search, bulk selection, and responsive file views;
 - follows the system light or dark theme and remembers manual theme changes locally;
 - creates, orders, previews, enables, disables, validates, and removes deterministic multi-condition rules from the responsive workspace.
-- optionally reviews only unmatched files with an installed Ollama model on `127.0.0.1`, then lets you accept, correct, or turn suggestions into deterministic rules.
+- optionally reviews unmatched files or an explicit selection with an installed Ollama model on `127.0.0.1`, then lets you accept, correct, or turn suggestions into deterministic rules.
 
 ## Custom rules
 
@@ -90,20 +90,20 @@ The workspace watches `.inboxfs.json` for changes. Saving a destination immediat
 
 ## Local AI preview
 
-Local AI review is optional and disabled by default. Install and run [Ollama](https://ollama.com/), pull a local model, then choose **Local AI** in InboxFS. Select the model, provide two or more allowed destination names, and enable the feature. InboxFS always applies deterministic rules first and sends only unmatched files to the selected model.
+Local AI review is optional and disabled by default. Install and run [Ollama](https://ollama.com/), pull a local model, then choose **Local AI** in InboxFS. Select the model, provide two or more allowed destination names, and enable the feature. InboxFS always applies deterministic rules first. Review the remaining unmatched files, or switch to **Selected** to explicitly review the files selected in the workspace.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/inboxfs-ai-dark.png">
   <img alt="InboxFS local AI review with selectable and correctable file suggestions" src="docs/inboxfs-ai.png">
 </picture>
 
-By default the model receives file name, extension, size, and modification time. Reading supported plain-text files is a separate opt-in; reads are capped at 32 KiB per file. Results never move files directly. You review each destination, can correct it, and add selected results to the ordinary organization plan. **Create rule** turns a useful result into an exact-name deterministic rule.
+By default the model receives file name, extension, size, and modification time. Reading supported plain text, PDF, and DOCX is a separate opt-in. Sources are capped at 16 MiB and extracted text at 32 KiB; PDFs stop after eight pages and DOCX reads only the bounded main document XML. Results never move files directly. You review each destination, can correct it, and add selected results to the ordinary organization plan. **Create rule** turns a useful result into an exact-name deterministic rule.
 
 InboxFS talks only to the fixed Ollama origin `http://127.0.0.1:11434`, rejects redirects and cloud-labelled models, and stores private settings and result-only cache files under `~/.inboxfs/`. No endpoint can be configured in the UI or settings file. A locally installed model can still be inaccurate, and a user-created Ollama alias cannot be cryptographically proven to contain no remote behavior. Read the [local AI privacy, evaluation, and threat model](docs/local-ai.md) before enabling text access.
 
 ## What it does not do yet
 
-InboxFS does not run OCR, parse PDFs or office documents for AI review, upload content, execute scripts, monitor subfolders, or learn rules automatically. Local AI review supports metadata and an optional bounded allowlist of plain-text formats; it remains advisory until you explicitly add a result to the plan.
+InboxFS does not run OCR, extract images or scanned-PDF text, parse legacy `.doc` files, upload content, execute scripts, monitor subfolders, or learn rules automatically. Local AI review supports metadata and optional bounded plain-text, PDF, and DOCX extraction; it remains advisory until you explicitly add a result to the plan.
 
 Undo history is stored as a private JSON file under `~/.inboxfs/`. Version 0.2 automatically migrates matching v0.1 history to collision-resistant per-directory ledgers. InboxFS is an organizer, not a backup system.
 
@@ -118,7 +118,7 @@ npm run check
 npm run dev -- /path/to/a/test-folder --no-open
 ```
 
-`npm run check` builds the Node server and React interface, runs the filesystem and HTTP safety tests, benchmarks 100 rules and local AI metadata preparation against 10,000 file records, enforces the 67.12 kB gzip budget for the main JavaScript bundle, and exercises the critical desktop and mobile workflows in Chromium. The browser suite also checks WCAG 2 AA accessibility rules and lazy-chunk recovery.
+`npm run check` builds the Node server and React interface, runs the filesystem and HTTP safety tests, benchmarks 100 rules, local AI metadata preparation against 10,000 file records, and bounded PDF/DOCX extraction, enforces the 67.12 kB gzip budget for the main JavaScript bundle, and exercises the critical desktop and mobile workflows in Chromium. The browser suite also checks WCAG 2 AA accessibility rules and lazy-chunk recovery.
 
 ## Safety model
 
