@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { ScanResult } from "../model.js";
 import { extractFileContext } from "./extractor.js";
 import type { AiClassification, AiJobSnapshot, AiProvider, AiReviewItem, AiSettings } from "./types.js";
+import { AiCache, aiCacheKey } from "./cache.js";
 
 const MAX_JOB_FILES = 100;
 const LOW_CONFIDENCE = 0.65;
@@ -31,7 +32,7 @@ function snapshot(job: StoredJob): AiJobSnapshot {
 export class AiJobManager {
   private readonly jobs = new Map<string, StoredJob>();
 
-  constructor(private readonly root: string, private readonly provider: AiProvider) {}
+  constructor(private readonly root: string, private readonly provider: AiProvider, private readonly cache?: AiCache) {}
 
   async start(scan: ScanResult, settings: AiSettings): Promise<AiJobSnapshot> {
     if (!settings.enabled) throw new Error("Enable local AI review before starting an analysis.");
@@ -98,8 +99,12 @@ export class AiJobManager {
         try {
           const context = await extractFileContext(this.root, item, settings.includeText);
           if (job.controller.signal.aborted) break;
+          const key = aiCacheKey(this.root, settings.model, settings.destinations, context);
+          const cachedInput = await this.cache?.get(key);
+          const cached = cachedInput ? validateClassification(cachedInput, settings.destinations) : undefined;
           const signal = AbortSignal.any([job.controller.signal, AbortSignal.timeout(FILE_TIMEOUT_MS)]);
-          const classification = validateClassification(await this.provider.classify(context, settings.destinations, settings.model, signal), settings.destinations);
+          const classification = cached ?? validateClassification(await this.provider.classify(context, settings.destinations, settings.model, signal), settings.destinations);
+          if (!cached) await this.cache?.set(key, classification);
           result = {
             suggestionId: item.id,
             name: item.name,
@@ -109,6 +114,7 @@ export class AiJobManager {
             explanation: classification.explanation,
             model: settings.model,
             textBytes: context.textBytes,
+            cached: Boolean(cached),
             status: classification.confidence < LOW_CONFIDENCE ? "needs-review" : "suggested",
           };
         } catch (error) {

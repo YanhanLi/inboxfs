@@ -40,6 +40,7 @@ export interface AiReviewItem {
   explanation?: string;
   model: string;
   textBytes: number;
+  cached?: boolean;
   status: "suggested" | "needs-review" | "failed";
   error?: string;
 }

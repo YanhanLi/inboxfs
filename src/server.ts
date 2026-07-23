@@ -12,10 +12,12 @@ import { AiJobManager } from "./ai/jobs.js";
 import { OllamaProvider } from "./ai/ollama.js";
 import { defaultAiSettingsPath, readAiSettings, writeAiSettings } from "./ai/settings.js";
 import type { AiProvider } from "./ai/types.js";
+import { AiCache } from "./ai/cache.js";
 
 export interface AppOptions {
   aiProvider?: AiProvider;
   aiSettingsPath?: string;
+  aiCachePath?: string;
 }
 
 export function createApp(root: string, webRoot?: string, options: AppOptions = {}) {
@@ -24,7 +26,8 @@ export function createApp(root: string, webRoot?: string, options: AppOptions = 
   const mutationLock = new MutationLock();
   const aiProvider = options.aiProvider ?? new OllamaProvider();
   const aiSettingsPath = options.aiSettingsPath ?? defaultAiSettingsPath();
-  const aiJobs = new AiJobManager(root, aiProvider);
+  const aiCachePath = options.aiCachePath ?? path.join(path.dirname(aiSettingsPath), "ai-cache.json");
+  const aiJobs = new AiJobManager(root, aiProvider, new AiCache(aiCachePath));
   app.use(express.json({ limit: "64kb" }));
   app.use((request, response, next) => {
     const host = request.headers.host;
