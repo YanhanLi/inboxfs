@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.1
+
+- Move recent activity and file rows into dedicated lazy modules, giving the main JavaScript budget reliable headroom across zlib implementations used by macOS and Linux CI.
+
 ## 0.8.0
 
 - Split rules, file details, activity history, and inbox summary into independently maintained, lazy-loaded interface modules.

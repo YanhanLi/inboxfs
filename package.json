@@ -1,6 +1,6 @@
 {
   "name": "inboxfs",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "A local-first inbox for organizing files with safe previews and undo.",
   "type": "module",
   "bin": {

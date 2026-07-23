@@ -3,15 +3,12 @@ import {
   ArchiveRestore,
   ArrowUpDown,
   Check,
-  Clock3,
   ClipboardCheck,
   Copy,
-  File,
   FolderClosed,
   FolderInput,
   HardDrive,
   History,
-  Info,
   Inbox,
   Moon,
   RefreshCw,
@@ -26,8 +23,9 @@ import type { MoveRecord, Scan, Suggestion } from "./types";
 
 const RulesDialog = lazy(() => import("./RulesDialog").catch(() => import("./LoadError")));
 const Inspector = lazy(() => import("./Inspector").catch(() => import("./LoadError")));
-const HistoryList = lazy(() => import("./HistoryList").catch(() => import("./LoadError")));
 const Summary = lazy(() => import("./Summary").catch(() => import("./LoadError")));
+const Activity = lazy(() => import("./Activity").catch(() => import("./LoadError")));
+const FileRows = lazy(() => import("./FileRows").catch(() => import("./LoadError")));
 
 type Theme = "light" | "dark";
 type SortOption = "name-asc" | "modified-desc" | "size-desc" | "destination-asc";
@@ -224,28 +222,13 @@ export function App() {
             <span>File</span><span>Destination</span><span>Size</span><span className="sr-only">Inspect</span>
           </div>
           {!scan && !scanError && [0, 1, 2, 3, 4].map((index) => <div className="row skeleton-row" key={index} aria-hidden="true"><span /><span /><span /><span /></div>)}
-          {visible.map((item) => <div className={`row${selected.has(item.id) ? " selected" : ""}${inspectedId === item.id ? " inspected" : ""}`} key={item.id}>
-            <label className="checkbox-cell"><input aria-label={`Select ${item.name}`} type="checkbox" checked={selected.has(item.id)} onChange={(event) => setItemSelected(item.id, event.target.checked)} /></label>
-            <div className="filename"><span className="file-icon"><File size={18} aria-hidden="true" /></span><span><strong title={item.name}>{item.name}</strong><small><Clock3 size={12} aria-hidden="true" />{new Date(item.modifiedAt).toLocaleDateString()}</small></span></div>
-            <div className={item.duplicateOf ? "destination duplicate" : "destination"}>
-              <span>{item.duplicateOf ? <Copy size={13} aria-hidden="true" /> : <FolderClosed size={13} aria-hidden="true" />}{item.duplicateOf ? "Duplicate" : item.category}</span>
-              {item.duplicateOf && <small title={item.duplicateOf}>{`Matches ${basename(item.duplicateOf)}`}</small>}
-            </div>
-            <span className="file-size">{formatSize(item.size)}</span>
-            <button className="row-action" aria-label={`Inspect ${item.name}`} title="Inspect file" onClick={() => setInspectedId(item.id)}><Info size={16} /></button>
-          </div>)}
+          {visible.length > 0 && <Suspense fallback={asyncFallback}><FileRows items={visible} selected={selected} inspectedId={inspectedId} onSelected={setItemSelected} onInspect={setInspectedId} /></Suspense>}
           {scan && !busy && !filtered.length && <div className="empty"><span><Inbox size={25} aria-hidden="true" /></span><strong>{query ? "No matching files" : "Inbox is clear"}</strong><p>{query ? "Try a different name or file view." : "No loose files match this view."}</p>{query && <button onClick={() => setQuery("")}>Clear search</button>}</div>}
           {!scan && scanError && <div className="empty error-empty"><span><AlertTriangle size={25} aria-hidden="true" /></span><strong>Preview unavailable</strong><p>Fix the local rule file, then scan again.</p><button onClick={() => void refresh()}>Scan again</button></div>}
         </div>
       </section>
 
-      <section className="activity" id="activity" aria-labelledby="activity-heading">
-        <div className="section-heading"><div><h2 id="activity-heading">Recent activity</h2><p>{history.length} moves recorded</p></div></div>
-        <div className="history-list">
-          {history.length > 0 && <Suspense fallback={asyncFallback}><HistoryList records={history} busy={busy} onUndo={undo} /></Suspense>}
-          {!history.length && <div className="activity-empty"><History size={18} aria-hidden="true" /><span>Organized files will appear here.</span></div>}
-        </div>
-      </section>
+      <Suspense fallback={asyncFallback}><Activity records={history} busy={busy} onUndo={undo} /></Suspense>
     </main>
 
     {inspected && <Suspense fallback={asyncFallback}><Inspector item={inspected} included={selected.has(inspected.id)} onClose={() => setInspectedId(undefined)} onSelected={(value) => setItemSelected(inspected.id, value)} /></Suspense>}
