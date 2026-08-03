@@ -35,6 +35,7 @@ try {
 
   await aiDialog.getByRole("button", { name: "Close local AI review" }).click();
   await page.getByRole("button", { name: "Use dark theme" }).click();
+  await page.waitForTimeout(300);
   await page.screenshot({ path: path.resolve("docs/inboxfs-workspace-dark.png"), fullPage: true });
 
   await rulesButton.click();

@@ -17,4 +17,21 @@ describe("bilingual project documentation", () => {
     }
     expect(JSON.parse(packageText).files).toContain("README.zh-CN.md");
   });
+
+  it("keeps bilingual plan export privacy guidance in sync", async () => {
+    const [english, chinese, packageText] = await Promise.all([
+      readFile("README.md", "utf8"),
+      readFile("README.zh-CN.md", "utf8"),
+      readFile("package.json", "utf8"),
+    ]);
+    for (const readme of [english, chinese]) {
+      expect(readme).toContain("inboxfs-plan.md");
+      expect(readme).toContain("inboxfs-plan.json");
+      expect(readme).toContain("Markdown");
+      expect(readme).toContain("JSON");
+    }
+    expect(english).toContain("File names can still be sensitive");
+    expect(chinese).toContain("文件名本身仍可能包含敏感信息");
+    expect(JSON.parse(packageText).version).toBe("0.13.0");
+  });
 });

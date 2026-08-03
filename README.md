@@ -55,6 +55,7 @@ npx github:YanhanLi/inboxfs ~/Desktop
 - follows the system light or dark theme and remembers manual theme changes locally;
 - creates, orders, previews, enables, disables, validates, and removes deterministic multi-condition rules from the responsive workspace.
 - optionally reviews unmatched files or an explicit selection with an installed Ollama model on `127.0.0.1`, then lets you accept, correct, or turn suggestions into deterministic rules.
+- exports the current selected plan as a local Markdown or JSON report before any files move.
 
 ## Custom rules
 
@@ -97,6 +98,12 @@ Rules are evaluated from top to bottom and the first enabled match wins. Conditi
 Version 1 extension-only files remain supported. The editor reads them without losing rules and writes normalized version 2 only after an explicit save. See [the v1 to v2 migration guide](docs/rules-v2.md) for the complete schema and compatibility behavior.
 
 The workspace watches `.inboxfs.json` for changes. Saving a destination immediately refreshes the preview and invalidates the previous suggestion IDs, so a stale organization plan cannot silently move files using a new rule.
+
+## Export a plan
+
+Choose Markdown or JSON beside the plan summary, then select **Export**. InboxFS downloads `inboxfs-plan.md` or `inboxfs-plan.json` directly in the browser without sending a request to an export service.
+
+The versioned report contains only the currently selected file names, planned destinations, byte sizes, classification basis, and duplicate status. It excludes the inbox root, suggestion IDs, hashes, absolute source and destination paths, modification times, file contents, and extracted AI text. File names can still be sensitive, so review a report before sharing it.
 
 ## Local AI preview
 

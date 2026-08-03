@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.13.0
+
+- Export the current selected organization plan as a deterministic Markdown or versioned JSON download before files move.
+- Keep report generation entirely in the browser and exclude roots, IDs, hashes, absolute paths, timestamps, contents, and extracted AI text.
+- Record only file names, planned destinations, byte sizes, classification basis, and duplicate status, with stable ordering and explicit privacy guidance.
+- Escape active HTML and Markdown table syntax from untrusted file names, destinations, and rule names.
+- Add bilingual documentation, desktop/mobile controls, download verification, and privacy regressions, bringing the gate to 60 unit/HTTP/documentation checks and 11 Chromium workflows.
+
 ## 0.12.0
 
 - Add `--demo`, which creates an isolated seven-file sample inbox without reading user files and removes it when InboxFS stops.

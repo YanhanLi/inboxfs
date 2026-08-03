@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { spawn } from "node:child_process";
-import { access } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 
 test.describe.serial("InboxFS workspace", () => {
@@ -25,6 +25,31 @@ test.describe.serial("InboxFS workspace", () => {
     await expect(page.getByRole("button", { name: "Edit classification rules", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Review unmatched files with local AI", exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+
+  test("downloads private Markdown and JSON organization plans", async ({ page }) => {
+    await page.goto("/");
+    const source = await (await page.request.get("/api/scan")).json();
+    const markdownDownload = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export", exact: true }).click();
+    const markdown = await markdownDownload;
+    expect(markdown.suggestedFilename()).toBe("inboxfs-plan.md");
+    const markdownText = await readFile(await markdown.path(), "utf8");
+    expect(markdownText).toContain("# InboxFS organization plan");
+    expect(markdownText).toContain("chapter.epub");
+    expect(markdownText).not.toContain(source.root);
+    expect(markdownText).not.toContain(source.suggestions[0].sourcePath);
+
+    await page.getByLabel("Plan export format", { exact: true }).selectOption("json");
+    const jsonDownload = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export", exact: true }).click();
+    const json = await jsonDownload;
+    expect(json.suggestedFilename()).toBe("inboxfs-plan.json");
+    const report = JSON.parse(await readFile(await json.path(), "utf8"));
+    expect(report.version).toBe(1);
+    expect(report.summary.files).toBe(3);
+    expect(report.items.map((item: { name: string }) => item.name)).toEqual(["chapter.epub", "notes.txt", "project-plan.unknown"]);
+    expect(JSON.stringify(report)).not.toContain(source.root);
   });
 
   test("previews, reorders, and saves multi-condition rules", async ({ page }) => {
